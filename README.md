@@ -75,3 +75,5 @@ The script creates a synthetic test account and saves screenshots in `.tmp\brows
 ## Deployment
 
 The app is prepared for Streamlit Community Cloud with Python 3.12 and `streamlit_app.py` as its entrypoint. Its required champion model files are in the repository. Configure durable private storage before accepting real user records; the default SQLite file is local to an ephemeral app container. No secrets or paid services are required for the demo.
+
+https://aureli-coorix-emi-predict-ai-15th-oct-ai-ml.streamlit.app/
