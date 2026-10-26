@@ -10,7 +10,7 @@ All six requested EMI workflows were trained on the user-authorized company CSV:
 
 ## Data and model limitations
 
-The user confirmed that the company supplied `C:\Users\verna\Downloads\emi_prediction_dataset.csv` and authorized its use for this internship project. The source CSV remains unchanged. All 404,800 rows had valid targets and no exact duplicate rows; the training run used a proportional sample of 120,000 rows because of local compute limits. The file fingerprint, cleaning and distributions are recorded at `artifacts/models/data_quality_report.md`.
+The user confirmed and authorized the company-supplied CSV for this internship project. The source CSV remains unchanged. All 404,800 rows had valid targets and no exact duplicate rows; the training run used a proportional sample of 120,000 rows because of local compute limits. The file fingerprint, cleaning and distributions are recorded in the local data-quality report.
 
 The dataset does not include its target-generation specification. The regression champion's held-out same-source R² is 0.9717; this does not establish generalization. High_Risk class precision/recall for the selected classifier is 0.174/0.512. These are educational model estimates, not calibrated approval probabilities or lending decisions. Company label documentation and external validation are required before production reliance.
 
@@ -30,4 +30,4 @@ All eight vendor checkouts remain preserved under `vendor/source/`; none of thei
 
 ## Deployment
 
-No deployment was performed. Local use requires no paid service. Hosted use still needs durable private storage and deployment-specific security and retention validation. Model target definition and external validation are prerequisites before production decisions.
+Deployment files target Streamlit Community Cloud using Python 3.12 and `streamlit_app.py`. Champion inference packages, their metadata and comparison table are included; source data, MLflow records and optional plot files are excluded. No deployment has been created. Community Cloud's SQLite filesystem is ephemeral, so hosted use with real financial records still needs durable private storage and deployment-specific security and retention validation. Model target definition and external validation are prerequisites before production decisions.

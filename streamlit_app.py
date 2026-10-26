@@ -415,14 +415,17 @@ elif page=="Model Laboratory":
             class_candidates=classification[classification.get("evaluation_path",pd.Series(index=classification.index,dtype=object)).notna()]
             if not class_candidates.empty:
                 chosen=st.selectbox("Classification model artifacts",class_candidates.to_dict("records"),index=next((i for i,row in enumerate(class_candidates.to_dict("records")) if row["model"]=="random_forest"),0),format_func=lambda row:model_labels.get(row["model"],row["model"]),key="classification_artifact_model")
-                evaluation=Path(str(chosen["evaluation_path"]))
+                evaluation=MODEL_DIR/"evaluation"/str(chosen["target"])/str(chosen["model"])
+                found_plot=False
                 for filename in ("confusion_matrix.html","calibration.html"):
                     plot_path=evaluation/filename
                     if plot_path.is_file():
+                        found_plot=True
                         st.markdown(f"**{filename.replace('_',' ').replace('.html','').title()} · {model_labels.get(chosen['model'],chosen['model'])}**")
                         html=plot_path.read_text(encoding="utf-8")
                         theme_script="""<script>(function(){function applyAureliTheme(){if(!window.Plotly)return;var plots=document.querySelectorAll('.js-plotly-plot');if(!plots.length){setTimeout(applyAureliTheme,80);return;}plots.forEach(function(plot){Plotly.relayout(plot,{'paper_bgcolor':'rgba(0,0,0,0)','plot_bgcolor':'#10242d','font.color':'#d9e9e3','xaxis.gridcolor':'#244149','yaxis.gridcolor':'#244149','xaxis.zerolinecolor':'#466169','yaxis.zerolinecolor':'#466169'});});}setTimeout(applyAureliTheme,200);})();</script>"""
                         st.components.v1.html(html.replace("</body>",theme_script+"</body>"),height=500,scrolling=True)
+                if not found_plot: st.info("Evaluation plots are not included in this deployment package. The held-out metrics remain available above.")
         with model_tabs[1]:
             columns={"model":"Model","mae":"Test MAE (₹)","rmse":"Test RMSE (₹)","r2":"Test R²"}
             regression_display=regression[list(columns)].rename(columns=columns).copy()
@@ -431,17 +434,23 @@ elif page=="Model Laboratory":
             reg_candidates=regression[regression.get("evaluation_path",pd.Series(index=regression.index,dtype=object)).notna()]
             if not reg_candidates.empty:
                 chosen=st.selectbox("Regression model artifacts",reg_candidates.to_dict("records"),index=next((i for i,row in enumerate(reg_candidates.to_dict("records")) if row["model"]=="random_forest"),0),format_func=lambda row:model_labels.get(row["model"],row["model"]),key="regression_artifact_model")
-                evaluation=Path(str(chosen["evaluation_path"]))
+                evaluation=MODEL_DIR/"evaluation"/str(chosen["target"])/str(chosen["model"])
+                found_plot=False
                 for filename in ("actual_vs_predicted.html","residuals.html"):
                     plot_path=evaluation/filename
                     if plot_path.is_file():
+                        found_plot=True
                         st.markdown(f"**{filename.replace('_',' ').replace('.html','').title()} · {model_labels.get(chosen['model'],chosen['model'])}**")
                         html=plot_path.read_text(encoding="utf-8")
                         theme_script="""<script>(function(){function applyAureliTheme(){if(!window.Plotly)return;var plots=document.querySelectorAll('.js-plotly-plot');if(!plots.length){setTimeout(applyAureliTheme,80);return;}plots.forEach(function(plot){Plotly.relayout(plot,{'paper_bgcolor':'rgba(0,0,0,0)','plot_bgcolor':'#10242d','font.color':'#d9e9e3','xaxis.gridcolor':'#244149','yaxis.gridcolor':'#244149','xaxis.zerolinecolor':'#466169','yaxis.zerolinecolor':'#466169'});});}setTimeout(applyAureliTheme,200);})();</script>"""
                         st.components.v1.html(html.replace("</body>",theme_script+"</body>"),height=500,scrolling=True)
+                if not found_plot: st.info("Evaluation plots are not included in this deployment package. The held-out metrics remain available above.")
         st.caption("Metrics are from an untouched held-out test set. Classification selection is by validation macro F1; regression selection is by validation RMSE.")
     else:
-        st.info("No Aureli experiment results have been recorded yet. The authorized company dataset is available locally; run the documented six-model training command to create the experiments and artifacts.")
+        if artifact_path("emi_eligibility").is_file() and artifact_path("max_monthly_emi").is_file():
+            st.info("Saved EMI models are available. The comparison report and optional evaluation plots are not included in this deployment package.")
+        else:
+            st.info("No Aureli experiment results have been recorded yet. The authorized company dataset is available locally; run the documented six-model training command to create the experiments and artifacts.")
     for target,title in [("emi_eligibility","Classification"),("max_monthly_emi","Regression")]:
         metadata=MODEL_DIR/f"{target}.metadata.json"
         if not metadata.is_file(): continue

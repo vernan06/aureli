@@ -1,0 +1,38 @@
+name: Linux Python 3.12 deployment check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install application and verification dependencies
+        run: python -m pip install -r requirements.txt -r requirements-training.txt
+      - name: Run existing test suite
+        run: python -m unittest discover -s tests -v
+      - name: Smoke start Streamlit
+        shell: bash
+        run: |
+          export AURELI_DB_PATH="$RUNNER_TEMP/aureli-smoke.sqlite3"
+          python -m streamlit run streamlit_app.py --server.port 8501 --server.headless true > "$RUNNER_TEMP/streamlit.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8501/_stcore/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/streamlit.log"
+          exit 1

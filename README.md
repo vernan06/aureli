@@ -27,12 +27,13 @@ All personal finance queries are scoped to the signed-in account. Stored money u
 
 ## Models and data
 
-The company-provided dataset at `C:\Users\verna\Downloads\emi_prediction_dataset.csv` was authorized by the user for this internship project. The source dataset and trained model artifacts are not included in Git. Actual model metrics, training method, sample design, MLflow experiment IDs and limits are documented in [docs/ML_RESULTS.md](docs/ML_RESULTS.md).
+The company-provided dataset was authorized for this internship project. Its source CSV is not included in Git. The two required trained inference pipelines, their compact champion metadata, and model comparison table are included under `artifacts/models/` for the public demo; full evaluation plots, data profiles and MLflow runs remain local and are not required for inference. Actual metrics, training method, sample design, MLflow experiment IDs and limits are documented in [docs/ML_RESULTS.md](docs/ML_RESULTS.md).
 
 Reproduce the local training run only when you have the authorized CSV at that path:
 
 ```powershell
-python -m aureli.ml.train "C:\Users\verna\Downloads\emi_prediction_dataset.csv" --confirm-data-rights --max-rows 120000 --artifact-dir artifacts/models
+$env:AURELI_DATASET_PATH = "C:\path\to\authorized\emi_prediction_dataset.csv"
+python -m aureli.ml.train "$env:AURELI_DATASET_PATH" --confirm-data-rights --max-rows 120000 --artifact-dir artifacts/models
 ```
 
 Add `--inspect-only` to audit the file without fitting models. A reproducible, proportional stratified sample is used above the 120,000-row local compute cap. Training writes local artifacts to `artifacts/models/` and MLflow runs to `mlruns/`; these paths are ignored by Git. Model outputs are educational only. High_Risk classification performance is weak and the dataset does not document target-generation rules. Do not use predictions for lending decisions.
@@ -73,4 +74,4 @@ The script creates a synthetic test account and saves screenshots in `.tmp\brows
 
 ## Deployment
 
-No deployment was performed. The app requires Python 3.12 and local model files for EMI inference. Before hosting, configure durable private storage for user records and model artifacts and validate deployment-specific security, retention and access controls. No paid service or GPU is required by the application code.
+The app is prepared for Streamlit Community Cloud with Python 3.12 and `streamlit_app.py` as its entrypoint. Its required champion model files are in the repository. Configure durable private storage before accepting real user records; the default SQLite file is local to an ephemeral app container. No secrets or paid services are required for the demo.

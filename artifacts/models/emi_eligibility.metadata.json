@@ -1,0 +1,511 @@
+{
+  "target": "emi_eligibility",
+  "task": "classification",
+  "model_name": "random_forest",
+  "classes": [
+    "Eligible",
+    "High_Risk",
+    "Not_Eligible"
+  ],
+  "feature_columns": [
+    "age",
+    "gender",
+    "marital_status",
+    "education",
+    "monthly_salary",
+    "employment_type",
+    "years_of_employment",
+    "company_type",
+    "house_type",
+    "monthly_rent",
+    "family_size",
+    "dependents",
+    "school_fees",
+    "college_fees",
+    "travel_expenses",
+    "groceries_utilities",
+    "other_monthly_expenses",
+    "existing_loans",
+    "current_emi_amount",
+    "credit_score",
+    "bank_balance",
+    "emergency_fund",
+    "emi_scenario",
+    "requested_amount",
+    "requested_tenure",
+    "current_emi_to_salary_ratio",
+    "salary_missing_flag",
+    "estimated_monthly_expenses",
+    "estimated_expense_ratio"
+  ],
+  "numeric_features": [
+    "age",
+    "monthly_salary",
+    "years_of_employment",
+    "monthly_rent",
+    "family_size",
+    "dependents",
+    "school_fees",
+    "college_fees",
+    "travel_expenses",
+    "groceries_utilities",
+    "other_monthly_expenses",
+    "current_emi_amount",
+    "credit_score",
+    "bank_balance",
+    "emergency_fund",
+    "requested_amount",
+    "requested_tenure",
+    "current_emi_to_salary_ratio",
+    "salary_missing_flag",
+    "estimated_monthly_expenses",
+    "estimated_expense_ratio"
+  ],
+  "categorical_features": [
+    "gender",
+    "marital_status",
+    "education",
+    "employment_type",
+    "company_type",
+    "house_type",
+    "existing_loans",
+    "emi_scenario"
+  ],
+  "dataset_sha256": "46a52dcbc80b8d736c5a42e9fa5173289e66bb9d30dd03e4e2f33e2b9c1a53c4",
+  "metrics": {
+    "accuracy": 0.8427083333333333,
+    "precision_macro": 0.6507376420203359,
+    "precision_weighted": 0.9110228051665369,
+    "recall_macro": 0.7314175930750416,
+    "recall_weighted": 0.8427083333333333,
+    "macro_f1": 0.6621362674226443,
+    "weighted_f1": 0.8706816107861517,
+    "per_class": {
+      "Eligible": {
+        "precision": 0.7997329773030708,
+        "recall": 0.8142274580879021,
+        "f1-score": 0.8069151324651999,
+        "support": 4414.0
+      },
+      "High_Risk": {
+        "precision": 0.1737565445026178,
+        "recall": 0.5120540019286403,
+        "f1-score": 0.2594673833374053,
+        "support": 1037.0
+      },
+      "Not_Eligible": {
+        "precision": 0.9787234042553191,
+        "recall": 0.8679713192085827,
+        "f1-score": 0.9200262864653276,
+        "support": 18549.0
+      },
+      "accuracy": 0.8427083333333333,
+      "macro avg": {
+        "precision": 0.6507376420203359,
+        "recall": 0.7314175930750416,
+        "f1-score": 0.6621362674226443,
+        "support": 24000.0
+      },
+      "weighted avg": {
+        "precision": 0.9110228051665369,
+        "recall": 0.8427083333333333,
+        "f1-score": 0.8706816107861517,
+        "support": 24000.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        3594,
+        642,
+        178
+      ],
+      [
+        334,
+        531,
+        172
+      ],
+      [
+        566,
+        1883,
+        16100
+      ]
+    ],
+    "classes": [
+      "Eligible",
+      "High_Risk",
+      "Not_Eligible"
+    ],
+    "roc_auc_ovr_macro": 0.9373084939843958,
+    "multiclass_brier_score": 0.2397293109596202,
+    "log_loss": 0.44729385886227596,
+    "expected_calibration_error_10_bins": 0.11859360328116741,
+    "calibration_bins": [
+      {
+        "lower": 0.30000000000000004,
+        "upper": 0.4,
+        "count": 1143,
+        "mean_confidence": 0.3783904626082751,
+        "accuracy": 0.3569553805774278
+      },
+      {
+        "lower": 0.4,
+        "upper": 0.5,
+        "count": 4515,
+        "mean_confidence": 0.4494300696472821,
+        "accuracy": 0.4717607973421927
+      },
+      {
+        "lower": 0.5,
+        "upper": 0.6,
+        "count": 2749,
+        "mean_confidence": 0.5454469129824471,
+        "accuracy": 0.803564932702801
+      },
+      {
+        "lower": 0.6000000000000001,
+        "upper": 0.7000000000000001,
+        "count": 2309,
+        "mean_confidence": 0.650296334969358,
+        "accuracy": 0.9588566478995236
+      },
+      {
+        "lower": 0.7000000000000001,
+        "upper": 0.8,
+        "count": 2468,
+        "mean_confidence": 0.7513787402491615,
+        "accuracy": 0.9931118314424635
+      },
+      {
+        "lower": 0.8,
+        "upper": 0.9,
+        "count": 3062,
+        "mean_confidence": 0.8522060136099695,
+        "accuracy": 0.999346832135859
+      },
+      {
+        "lower": 0.9,
+        "upper": 1.0,
+        "count": 7754,
+        "mean_confidence": 0.9674041410516004,
+        "accuracy": 0.9998710343048749
+      }
+    ]
+  },
+  "validation_score": 0.6601600901148986,
+  "registered_model": "aureli-emi_eligibility",
+  "registered_version": 1,
+  "input_feature_columns": [
+    "age",
+    "gender",
+    "marital_status",
+    "education",
+    "monthly_salary",
+    "employment_type",
+    "years_of_employment",
+    "company_type",
+    "house_type",
+    "monthly_rent",
+    "family_size",
+    "dependents",
+    "school_fees",
+    "college_fees",
+    "travel_expenses",
+    "groceries_utilities",
+    "other_monthly_expenses",
+    "existing_loans",
+    "current_emi_amount",
+    "credit_score",
+    "bank_balance",
+    "emergency_fund",
+    "emi_scenario",
+    "requested_amount",
+    "requested_tenure"
+  ],
+  "input_numeric_features": [
+    "age",
+    "monthly_salary",
+    "years_of_employment",
+    "monthly_rent",
+    "family_size",
+    "dependents",
+    "school_fees",
+    "college_fees",
+    "travel_expenses",
+    "groceries_utilities",
+    "other_monthly_expenses",
+    "current_emi_amount",
+    "credit_score",
+    "bank_balance",
+    "emergency_fund",
+    "requested_amount",
+    "requested_tenure"
+  ],
+  "input_categorical_values": {
+    "gender": [
+      "Female",
+      "Male"
+    ],
+    "marital_status": [
+      "Married",
+      "Single"
+    ],
+    "education": [
+      "Graduate",
+      "High School",
+      "Post Graduate",
+      "Professional"
+    ],
+    "employment_type": [
+      "Government",
+      "Private",
+      "Self-employed"
+    ],
+    "company_type": [
+      "Large Indian",
+      "MNC",
+      "Mid-size",
+      "Small",
+      "Startup"
+    ],
+    "house_type": [
+      "Family",
+      "Own",
+      "Rented"
+    ],
+    "existing_loans": [
+      "No",
+      "Yes"
+    ],
+    "emi_scenario": [
+      "E-commerce Shopping EMI",
+      "Education EMI",
+      "Home Appliances EMI",
+      "Personal Loan EMI",
+      "Vehicle EMI"
+    ]
+  },
+  "input_numeric_defaults": {
+    "age": 38.0,
+    "monthly_salary": 51700.0,
+    "years_of_employment": 3.2,
+    "monthly_rent": 0.0,
+    "family_size": 3.0,
+    "dependents": 2.0,
+    "school_fees": 3000.0,
+    "college_fees": 0.0,
+    "travel_expenses": 4900.0,
+    "groceries_utilities": 11400.0,
+    "other_monthly_expenses": 6000.0,
+    "current_emi_amount": 0.0,
+    "credit_score": 701.0,
+    "bank_balance": 196000.0,
+    "emergency_fund": 74000.0,
+    "requested_amount": 236000.0,
+    "requested_tenure": 25.0
+  },
+  "feature_importance": [
+    {
+      "name": "numeric__requested_amount",
+      "importance": 0.21589102430676624
+    },
+    {
+      "name": "numeric__estimated_expense_ratio",
+      "importance": 0.18546002668550243
+    },
+    {
+      "name": "numeric__monthly_salary",
+      "importance": 0.0778766760305288
+    },
+    {
+      "name": "numeric__requested_tenure",
+      "importance": 0.05773907471514217
+    },
+    {
+      "name": "numeric__groceries_utilities",
+      "importance": 0.040927990647410366
+    },
+    {
+      "name": "numeric__current_emi_to_salary_ratio",
+      "importance": 0.033621194372345564
+    },
+    {
+      "name": "numeric__bank_balance",
+      "importance": 0.03277460155903657
+    },
+    {
+      "name": "numeric__travel_expenses",
+      "importance": 0.03020576326789008
+    },
+    {
+      "name": "numeric__estimated_monthly_expenses",
+      "importance": 0.028733451671749222
+    },
+    {
+      "name": "categorical__existing_loans_Yes",
+      "importance": 0.026476709370653374
+    },
+    {
+      "name": "numeric__current_emi_amount",
+      "importance": 0.025716903362663874
+    },
+    {
+      "name": "numeric__other_monthly_expenses",
+      "importance": 0.022378872034906117
+    },
+    {
+      "name": "numeric__emergency_fund",
+      "importance": 0.021927297043174285
+    },
+    {
+      "name": "numeric__credit_score",
+      "importance": 0.02173663511168895
+    },
+    {
+      "name": "categorical__existing_loans_No",
+      "importance": 0.0211140175095411
+    },
+    {
+      "name": "numeric__monthly_rent",
+      "importance": 0.020798029948812097
+    },
+    {
+      "name": "numeric__college_fees",
+      "importance": 0.020061348247516493
+    },
+    {
+      "name": "categorical__house_type_Rented",
+      "importance": 0.01890677053846976
+    },
+    {
+      "name": "numeric__school_fees",
+      "importance": 0.017569102110938276
+    },
+    {
+      "name": "numeric__years_of_employment",
+      "importance": 0.014131277314459168
+    },
+    {
+      "name": "categorical__emi_scenario_E-commerce Shopping EMI",
+      "importance": 0.005340691003895026
+    },
+    {
+      "name": "categorical__emi_scenario_Vehicle EMI",
+      "importance": 0.005306090725411797
+    },
+    {
+      "name": "numeric__age",
+      "importance": 0.005181201604488374
+    },
+    {
+      "name": "categorical__emi_scenario_Personal Loan EMI",
+      "importance": 0.004606557709410573
+    },
+    {
+      "name": "numeric__family_size",
+      "importance": 0.004398931595141404
+    },
+    {
+      "name": "numeric__dependents",
+      "importance": 0.0041738438069901995
+    },
+    {
+      "name": "categorical__emi_scenario_Home Appliances EMI",
+      "importance": 0.003852801857255362
+    },
+    {
+      "name": "categorical__house_type_Own",
+      "importance": 0.0029645720499300154
+    },
+    {
+      "name": "categorical__house_type_Family",
+      "importance": 0.002680756084940072
+    },
+    {
+      "name": "categorical__employment_type_Private",
+      "importance": 0.0021415143234846537
+    },
+    {
+      "name": "categorical__education_Graduate",
+      "importance": 0.0021357566002006226
+    },
+    {
+      "name": "categorical__employment_type_Government",
+      "importance": 0.0021203632737615678
+    },
+    {
+      "name": "categorical__gender_Female",
+      "importance": 0.0020325482974810987
+    },
+    {
+      "name": "categorical__company_type_Large Indian",
+      "importance": 0.0020091841008548755
+    },
+    {
+      "name": "categorical__gender_Male",
+      "importance": 0.0019610144433030493
+    },
+    {
+      "name": "categorical__education_Professional",
+      "importance": 0.0018282990943379273
+    },
+    {
+      "name": "categorical__emi_scenario_Education EMI",
+      "importance": 0.001798847996903272
+    },
+    {
+      "name": "categorical__company_type_Mid-size",
+      "importance": 0.0016920793753139225
+    },
+    {
+      "name": "categorical__education_Post Graduate",
+      "importance": 0.001589453003783747
+    },
+    {
+      "name": "categorical__company_type_MNC",
+      "importance": 0.0015508788231332047
+    },
+    {
+      "name": "categorical__marital_status_Single",
+      "importance": 0.0015051683957642344
+    },
+    {
+      "name": "categorical__company_type_Startup",
+      "importance": 0.0012245717016852477
+    },
+    {
+      "name": "categorical__marital_status_Married",
+      "importance": 0.0011938584357100153
+    },
+    {
+      "name": "categorical__education_High School",
+      "importance": 0.0011712655338708305
+    },
+    {
+      "name": "categorical__employment_type_Self-employed",
+      "importance": 0.0009162866992029969
+    },
+    {
+      "name": "categorical__company_type_Small",
+      "importance": 0.00042024732556332945
+    },
+    {
+      "name": "numeric__missingindicator_emergency_fund",
+      "importance": 9.36729300460373e-05
+    },
+    {
+      "name": "numeric__missingindicator_monthly_rent",
+      "importance": 3.7261746720370915e-05
+    },
+    {
+      "name": "numeric__missingindicator_bank_balance",
+      "importance": 1.4436846216871576e-05
+    },
+    {
+      "name": "numeric__missingindicator_credit_score",
+      "importance": 1.1078766004559761e-05
+    }
+  ],
+  "evaluation_path": "artifacts\\models\\evaluation\\emi_eligibility\\random_forest",
+  "format_version": 1,
+  "random_state": 42
+}

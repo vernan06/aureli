@@ -47,15 +47,15 @@ No financial values were fabricated or capped. The test set has not been used fo
 
 ## Saved outputs
 
-- Inference pipelines (including preprocessing): `artifacts/models/emi_eligibility.joblib`, `artifacts/models/max_monthly_emi.joblib`.
-- Champion metadata and full test metrics: corresponding `*.metadata.json` files in `artifacts/models/`.
-- Six-model comparison: `artifacts/models/model_comparison.csv`.
+- Inference pipelines (including preprocessing): `artifacts/models/emi_eligibility.joblib`, `artifacts/models/max_monthly_emi.joblib` (included in the GitHub demo repository).
+- Champion metadata and full test metrics: corresponding `*.metadata.json` files in `artifacts/models/` (included in the GitHub demo repository).
+- Six-model comparison: `artifacts/models/model_comparison.csv` (included in the GitHub demo repository).
 - Full data quality profile/report: `artifacts/models/dataset_profile.json`, `artifacts/models/data_quality_report.md`.
 - Local MLflow experiments: `mlruns/`; classification experiment ID `493838325564776429`, regression experiment ID `317780232923495581`. Each of the six successful estimator runs records parameters, test metrics, data fingerprint, preprocessing/model artifacts, evaluation plots, SHAP artifacts where supported, and training duration. Champion model versions are registered locally as `aureli-emi_eligibility` v1 and `aureli-max_monthly_emi` v1.
-- Model outputs and MLflow files are local, ignored by Git, and not committed.
+- Original training CSV and local MLflow files are not committed. Evaluation plot files and data-quality profiles are optional at runtime; the UI reports when deployment omits them. The saved preprocessing/model pipelines are sufficient for predictions.
 
 Reproduce from the repository root:
 
 ```powershell
-.venv\Scripts\python.exe -m aureli.ml.train "C:\Users\verna\Downloads\emi_prediction_dataset.csv" --confirm-data-rights --max-rows 120000 --artifact-dir artifacts/models
+.venv\Scripts\python.exe -m aureli.ml.train "<authorized-local-csv-path>" --confirm-data-rights --max-rows 120000 --artifact-dir artifacts/models
 ```
