@@ -40,3 +40,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
+/data/
+/mlruns/
+/mlartifacts/
+/artifacts/
+/.tmp/
