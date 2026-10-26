@@ -357,8 +357,9 @@ elif page=="AI Assessment":
                     with section:
                         for index,feature in enumerate(groups[group_name]):
                             numeric=feature in artifact.get("input_numeric_features",artifact["numeric_features"])
-                            label=feature.replace("_"," ").strip().title()
-                            help_text={"monthly_salary":"Your gross or take-home monthly income, matching the dataset definition.","requested_amount":"The amount you are considering borrowing.","credit_score":"Enter your reported score if known; do not guess.","monthly_rent":"Your monthly rent or housing cost.","bank_balance":"Current bank balance, in rupees.","current_emi_amount":"Total existing monthly loan installments."}.get(feature)
+                            labels={"groceries_utilities":"Groceries & Utilities","requested_tenure":"Requested tenure (months)","monthly_salary":"Monthly salary (₹)","requested_amount":"Requested loan amount (₹)","monthly_rent":"Monthly rent (₹)","bank_balance":"Bank balance (₹)","current_emi_amount":"Current monthly EMI total (₹)","school_fees":"Monthly school fees (₹)","college_fees":"Monthly college fees (₹)","travel_expenses":"Monthly travel expenses (₹)","other_monthly_expenses":"Other monthly expenses (₹)","emergency_fund":"Emergency fund (₹)"}
+                            label=labels.get(feature,feature.replace("_"," ").strip().title())
+                            help_text={"monthly_salary":"Your gross or take-home monthly income, matching the dataset definition.","requested_amount":"The amount you are considering borrowing, in rupees.","requested_tenure":"Enter the loan term in months.","credit_score":"Enter your reported score if known; do not guess.","monthly_rent":"Your monthly rent or housing cost, in rupees.","bank_balance":"Current bank balance, in rupees.","current_emi_amount":"Total existing monthly loan installments, in rupees.","emi_scenario":"The dataset's EMI scenario category describes the type of EMI estimate being considered; choose the closest available option."}.get(feature)
                             if numeric:
                                 raw=section.text_input(label,placeholder="Optional · uses model preprocessing if blank",key=f"input_{target}_{feature}",help=help_text)
                                 values[feature]=raw if raw.strip() else None
@@ -387,7 +388,11 @@ elif page=="AI Assessment":
                         st.caption(f"Model: {result['model_name']} · dataset fingerprint: {result['dataset_sha256'][:12]}")
                         explanation=explain_prediction(target,values)
                         st.markdown(f"**Why this estimate?** {explanation['method']}")
-                        if explanation["features"]: st.dataframe(explanation["features"],hide_index=True)
+                        if explanation["features"]:
+                            feature_labels={"groceries_utilities":"Groceries & Utilities","monthly_salary":"Monthly salary","requested_amount":"Requested loan amount","requested_tenure":"Requested tenure (months)","current_emi_amount":"Current monthly EMI","monthly_rent":"Monthly rent","bank_balance":"Bank balance","emergency_fund":"Emergency fund","years_of_employment":"Years of employment","school_fees":"School fees","college_fees":"College fees","travel_expenses":"Travel expenses","other_monthly_expenses":"Other monthly expenses"}
+                            explanation_rows=[{**row,"feature":feature_labels.get(row["feature"].split("__")[-1],row["feature"].replace("_"," ").replace("__"," · ").title())} for row in explanation["features"]]
+                            st.dataframe(explanation_rows,hide_index=True)
+                            st.caption("For SHAP explanations, positive and negative contributions show how inputs move the model estimate relative to its baseline. They are not direct financial gains or deductions.")
                         st.info("Use this as an educational estimate only. It does not assess your full financial circumstances or make a credit decision.")
                     except Exception as exc: st.error(f"Prediction could not be produced: {exc}")
 
@@ -401,25 +406,40 @@ elif page=="Model Laboratory":
         classification=table[table["task"]=="classification"]
         regression=table[table["task"]=="regression"]
         model_tabs=st.tabs(["Eligibility classification","Maximum EMI regression"])
+        model_labels={"logistic_regression":"Logistic Regression","random_forest":"Random Forest","xgboost":"XGBoost","linear_regression":"Linear Regression"}
         with model_tabs[0]:
             columns={"model":"Model","accuracy":"Test accuracy","macro_f1":"Macro F1","weighted_f1":"Weighted F1","roc_auc_ovr_macro":"Macro ROC AUC","multiclass_brier_score":"Brier score","log_loss":"Log loss","expected_calibration_error_10_bins":"Calibration error"}
-            st.dataframe(classification[list(columns)].rename(columns=columns).round(4),use_container_width=True,hide_index=True)
+            class_display=classification[list(columns)].rename(columns=columns).copy()
+            class_display["Model"]=class_display["Model"].map(model_labels).fillna(class_display["Model"])
+            st.dataframe(class_display.round(4),use_container_width=True,hide_index=True)
+            class_candidates=classification[classification.get("evaluation_path",pd.Series(index=classification.index,dtype=object)).notna()]
+            if not class_candidates.empty:
+                chosen=st.selectbox("Classification model artifacts",class_candidates.to_dict("records"),index=next((i for i,row in enumerate(class_candidates.to_dict("records")) if row["model"]=="random_forest"),0),format_func=lambda row:model_labels.get(row["model"],row["model"]),key="classification_artifact_model")
+                evaluation=Path(str(chosen["evaluation_path"]))
+                for filename in ("confusion_matrix.html","calibration.html"):
+                    plot_path=evaluation/filename
+                    if plot_path.is_file():
+                        st.markdown(f"**{filename.replace('_',' ').replace('.html','').title()} · {model_labels.get(chosen['model'],chosen['model'])}**")
+                        html=plot_path.read_text(encoding="utf-8")
+                        theme_script="""<script>(function(){function applyAureliTheme(){if(!window.Plotly)return;var plots=document.querySelectorAll('.js-plotly-plot');if(!plots.length){setTimeout(applyAureliTheme,80);return;}plots.forEach(function(plot){Plotly.relayout(plot,{'paper_bgcolor':'rgba(0,0,0,0)','plot_bgcolor':'#10242d','font.color':'#d9e9e3','xaxis.gridcolor':'#244149','yaxis.gridcolor':'#244149','xaxis.zerolinecolor':'#466169','yaxis.zerolinecolor':'#466169'});});}setTimeout(applyAureliTheme,200);})();</script>"""
+                        st.components.v1.html(html.replace("</body>",theme_script+"</body>"),height=500,scrolling=True)
         with model_tabs[1]:
             columns={"model":"Model","mae":"Test MAE (₹)","rmse":"Test RMSE (₹)","r2":"Test R²"}
-            st.dataframe(regression[list(columns)].rename(columns=columns).round(3),use_container_width=True,hide_index=True)
+            regression_display=regression[list(columns)].rename(columns=columns).copy()
+            regression_display["Model"]=regression_display["Model"].map(model_labels).fillna(regression_display["Model"])
+            st.dataframe(regression_display.round(3),use_container_width=True,hide_index=True)
+            reg_candidates=regression[regression.get("evaluation_path",pd.Series(index=regression.index,dtype=object)).notna()]
+            if not reg_candidates.empty:
+                chosen=st.selectbox("Regression model artifacts",reg_candidates.to_dict("records"),index=next((i for i,row in enumerate(reg_candidates.to_dict("records")) if row["model"]=="random_forest"),0),format_func=lambda row:model_labels.get(row["model"],row["model"]),key="regression_artifact_model")
+                evaluation=Path(str(chosen["evaluation_path"]))
+                for filename in ("actual_vs_predicted.html","residuals.html"):
+                    plot_path=evaluation/filename
+                    if plot_path.is_file():
+                        st.markdown(f"**{filename.replace('_',' ').replace('.html','').title()} · {model_labels.get(chosen['model'],chosen['model'])}**")
+                        html=plot_path.read_text(encoding="utf-8")
+                        theme_script="""<script>(function(){function applyAureliTheme(){if(!window.Plotly)return;var plots=document.querySelectorAll('.js-plotly-plot');if(!plots.length){setTimeout(applyAureliTheme,80);return;}plots.forEach(function(plot){Plotly.relayout(plot,{'paper_bgcolor':'rgba(0,0,0,0)','plot_bgcolor':'#10242d','font.color':'#d9e9e3','xaxis.gridcolor':'#244149','yaxis.gridcolor':'#244149','xaxis.zerolinecolor':'#466169','yaxis.zerolinecolor':'#466169'});});}setTimeout(applyAureliTheme,200);})();</script>"""
+                        st.components.v1.html(html.replace("</body>",theme_script+"</body>"),height=500,scrolling=True)
         st.caption("Metrics are from an untouched held-out test set. Classification selection is by validation macro F1; regression selection is by validation RMSE.")
-        candidates=table[table.get("evaluation_path",pd.Series(index=table.index,dtype=object)).notna()] if "evaluation_path" in table else pd.DataFrame()
-        if not candidates.empty:
-            selected=st.selectbox("Evaluation artifact",candidates.to_dict("records"),format_func=lambda r:f"{r['target']} · {r['model']}")
-            evaluation=Path(str(selected["evaluation_path"]))
-            filenames=["confusion_matrix.html","calibration.html"] if selected["task"]=="classification" else ["actual_vs_predicted.html","residuals.html"]
-            for filename in filenames:
-                plot_path=evaluation/filename
-                if plot_path.is_file():
-                    st.markdown(f"**{filename.replace('_',' ').replace('.html','').title()}**")
-                    html=plot_path.read_text(encoding="utf-8")
-                    theme_script="""<script>(function(){function applyAureliTheme(){if(!window.Plotly)return;var plots=document.querySelectorAll('.js-plotly-plot');if(!plots.length){setTimeout(applyAureliTheme,80);return;}plots.forEach(function(plot){Plotly.relayout(plot,{'paper_bgcolor':'rgba(0,0,0,0)','plot_bgcolor':'#10242d','font.color':'#d9e9e3','xaxis.gridcolor':'#244149','yaxis.gridcolor':'#244149','xaxis.zerolinecolor':'#466169','yaxis.zerolinecolor':'#466169'});});}setTimeout(applyAureliTheme,200);})();</script>"""
-                    st.components.v1.html(html.replace("</body>",theme_script+"</body>"),height=500,scrolling=True)
     else:
         st.info("No Aureli experiment results have been recorded yet. The authorized company dataset is available locally; run the documented six-model training command to create the experiments and artifacts.")
     for target,title in [("emi_eligibility","Classification"),("max_monthly_emi","Regression")]:
@@ -427,13 +447,15 @@ elif page=="Model Laboratory":
         if not metadata.is_file(): continue
         import json
         info=json.loads(metadata.read_text(encoding="utf-8"))
-        st.subheader(f"{title} champion · {info['model_name']} · version {info['registered_version']}")
-        st.json(info["metrics"])
-        if target=="emi_eligibility" and "confusion_matrix" in info["metrics"]:
-            import plotly.express as px
-            fig=px.imshow(info["metrics"]["confusion_matrix"],x=info["metrics"]["classes"],y=info["metrics"]["classes"],text_auto=True,color_continuous_scale="Teal",labels={"x":"Predicted","y":"Actual","color":"Count"})
-            st.plotly_chart(fig,use_container_width=True)
-        st.dataframe(info.get("feature_importance",[])[:20],hide_index=True)
+        readable_model={"logistic_regression":"Logistic Regression","random_forest":"Random Forest","xgboost":"XGBoost","linear_regression":"Linear Regression"}.get(info["model_name"],info["model_name"].replace("_"," ").title())
+        st.subheader(f"{title} champion · {readable_model} · version {info['registered_version']}")
+        champion_title="Classification" if target=="emi_eligibility" else "Regression"
+        with st.expander(f"{champion_title} champion technical details"):
+            st.json(info["metrics"])
+            importance=info.get("feature_importance",[])[:20]
+            if importance:
+                feature_labels={"groceries_utilities":"Groceries & Utilities","monthly_salary":"Monthly salary","requested_amount":"Requested loan amount","requested_tenure":"Requested tenure (months)","current_emi_amount":"Current monthly EMI","monthly_rent":"Monthly rent","bank_balance":"Bank balance","emergency_fund":"Emergency fund"}
+                st.dataframe([{**row,"feature":feature_labels.get(row.get("feature",""),row.get("feature","").replace("_"," ").title())} for row in importance],hide_index=True)
 
 elif page=="Financial Twin":
     page_header("Financial twin","Model a monthly plan using recorded cash flow. Scenarios never change saved records.")

@@ -90,7 +90,7 @@ class StreamlitJourneyTests(unittest.TestCase):
         app=AppTest.from_file(str(PROJECT/"streamlit_app.py"),default_timeout=90).run()
         app.session_state["user"]={"id":user_id,"name":"Model"}; app.run()
         app.radio[0].set_value("EMI Prediction").run()
-        salaries=[item for item in app.text_input if item.label=="Monthly Salary"]
+        salaries=[item for item in app.text_input if item.label=="Monthly salary (₹)"]
         self.assertEqual(len(salaries),2)
         for item in salaries: item.input("55000")
         app.run()
