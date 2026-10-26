@@ -1,14 +1,14 @@
 [server]
 headless = true
-enableCORS = false
-enableXsrfProtection = false
+enableCORS = true
+enableXsrfProtection = true
 maxUploadSize = 200
 
 [browser]
 gatherUsageStats = false
 
 [theme]
-primaryColor = "#0EA5E9"
-backgroundColor = "#0B1021"
-secondaryBackgroundColor = "#121A33"
-textColor = "#E2E8F0"
+primaryColor = "#3BC6A5"
+backgroundColor = "#08151E"
+secondaryBackgroundColor = "#10242D"
+textColor = "#EAF5F0"
