@@ -1,17 +1,18 @@
 # Aureli local demo walkthrough
 
-Launch the local app with `.venv\Scripts\streamlit.exe run streamlit_app.py`, then select **Continue in guest demo mode**. The guest workspace begins empty and is deleted when the guest session ends. The signed-in product uses local SQLite records, and the trained EMI pipelines are loaded from `artifacts/models/`.
+Start the local app with `.venv\Scripts\streamlit.exe run streamlit_app.py`, then choose **Continue in guest demo mode**. This walkthrough uses a new empty demo workspace. For a persistent local journey, create an account instead.
 
-1. **Overview:** review current-month income, expenses and surplus, recorded loan principal, cash-flow trend, savings progress, budgets and guidance. Empty sections explain what data is needed.
-2. **Financial Planner → Transactions:** add income and categorized expenses, then edit or remove a ledger entry. Return to Overview and see recorded totals update.
-3. **Budgets:** create a monthly groceries or rent limit and compare the saved transaction spend with the remaining amount.
-4. **Savings Goals:** add a goal and dated contribution; check contribution history and progress.
-5. **Settings:** save typical monthly income and emergency funds. Add a recurring obligation such as rent, then pause or reactivate it.
-6. **Loan Simulator:** create a loan, inspect its EMI and amortization schedule, record a lender-confirmed principal payment, and inspect the remaining principal. Compare snowball and avalanche payoff orders; simulations do not alter the saved loans.
-7. **Financial Twin:** change hypothetical income, expenses, savings, new borrowing or prepayments. Review projected surplus, EMI, debt-to-income and savings. These scenario inputs never mutate actual records.
-8. **Reports:** download a CSV containing available saved transactions, totals, budgets, goals, loans, payment history and recurring obligations.
-9. **EMI Prediction:** enter a financial profile and view the trained model's eligibility class and estimated maximum monthly EMI, with explanatory factors where available. Results are model estimates, not lending decisions. The regression range and target-label limitations are described in `docs/ML_RESULTS.md`.
-10. **Model Laboratory:** inspect the six-model comparison, held-out test metrics, confusion matrices, calibration diagnostics and regression residual/actual-vs-predicted views. Metrics are from the authorized company CSV and are not synthetic fixture scores.
-11. **End guest session:** sign out; the guest's stored records are removed. A regular local account is available for persistent local use.
+1. **Overview:** see current-month income, expenses, surplus and recorded loan principal. Record data to populate the formatted monthly cash-flow chart. Inspect contribution-inclusive savings progress, budget remaining/utilization, personal guidance and model readiness.
+2. **Financial Planner → Transactions:** add salary income and categorized expenses. Edit an entry, then remove a selected row using the safe selection control. Return to Overview and review the updated totals.
+3. **Budgets:** create a groceries or rent limit. Aureli displays amount spent, utilization percentage, remaining amount, progress and an overspending message when applicable.
+4. **Savings Goals:** create an emergency fund target and contribution. Confirm the total matches Overview. Review history, enter a planned monthly contribution to estimate time to target, and update the goal if needed.
+5. **Settings:** save typical monthly income and emergency-fund amount, then add and pause/reactivate recurring obligations.
+6. **Loan Simulator:** enter a name, principal, rate, term, start date and optional extra principal. See the EMI, total repayment, interest and duration preview update while editing. Save the loan to inspect the remaining-balance schedule, payment breakdown, progress and history.
+7. **Record a loan payment:** use the lender statement to confirm the principal component. Aureli pre-fills an estimate, previews the outstanding balance, blocks zero-principal/placeholder and duplicate submissions, then refreshes the next payment form after recording.
+8. **Compare payoff:** select an existing loan, set an extra monthly principal amount and compare estimated interest/time saved. With multiple loans, compare snowball and avalanche strategies. These simulations do not alter saved balances.
+9. **Financial Twin:** change income, expenses, borrowing, extra repayment and savings inputs. Review projected surplus, EMI, debt service and savings. Check that actual records remain unchanged.
+10. **EMI Prediction:** enter known details in the guided financial sections and run both saved models. Inspect estimated class, model scores, maximum EMI and feature explanations. Results are educational estimates, not lending decisions.
+11. **Model Laboratory:** show the six actual model metrics, champion comparisons, confusion/calibration and regression evaluation plots, MLflow records, dataset summary, preprocessing method and limitations.
+12. **Reports and sign-out:** download a CSV report, then end the guest session. Guest records are removed; another account’s data remains isolated.
 
-This is a written walkthrough of implemented functionality. No demo video was recorded.
+This is a written guide to the implemented local product. No demo video was recorded. The managed environment did not permit a current live HTTP/browser check, so human acceptance should include launching the app in a normal local Windows session and reviewing desktop/mobile sizing.

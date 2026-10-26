@@ -27,15 +27,30 @@ from aureli.persistence.db import initialize
 MODEL_DIR=Path("artifacts/models")
 st.set_page_config(page_title="Aureli — Financial intelligence", page_icon="✦", layout="wide")
 st.markdown("""<style>
-:root{color-scheme:dark} .stApp{background:#08151e;color:#edf5f2}
-[data-testid="stSidebar"]{background:#0d2029;border-right:1px solid #1a3740}
-[data-testid="stMetric"]{background:#10242d;border:1px solid #203b42;padding:18px;border-radius:14px}
-h1,h2,h3{color:#eaf5f0} .aureli-sub{color:#8ca8a7;font-size:1rem}
-.stButton>button{border-radius:9px;border:1px solid #247e69}
+:root{color-scheme:dark;--ink:#edf7f3;--muted:#91aaa7;--panel:#10242d;--line:#244149;--mint:#58d6b1}
+.stApp{background:radial-gradient(ellipse at 78% -12%,#153b3b 0%,#0b1d25 42%,#08151e 75%);color:var(--ink)}
+[data-testid="stSidebar"]{background:#0b1c24;border-right:1px solid #1a3740}
+[data-testid="stSidebar"] [data-testid="stRadio"] label{border-radius:9px;padding:.36rem .5rem}
+[data-testid="stMetric"]{background:linear-gradient(145deg,#122b33,#0e2029);border:1px solid var(--line);padding:17px 19px;border-radius:16px;box-shadow:0 8px 26px #0002}
+[data-testid="stMetricLabel"]{color:var(--muted)} [data-testid="stMetricValue"]{font-variant-numeric:tabular-nums}
+h1,h2,h3{color:#eaf5f0;letter-spacing:-.025em}.aureli-sub{color:var(--muted);font-size:1rem;margin-top:-.7rem}
+.stButton>button,.stFormSubmitButton>button{border-radius:10px;border:1px solid #328b77;transition:all .16s ease}
+.stButton>button:hover,.stFormSubmitButton>button:hover{border-color:var(--mint);color:var(--mint)}
+[data-testid="stDataFrame"],[data-testid="stPlotlyChart"],[data-testid="stExpander"]{border-radius:14px;overflow:hidden}
+[data-testid="stProgress"]>div>div{background:linear-gradient(90deg,#3bc6a5,#73e1bb)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--mint)!important;outline-offset:2px}
+@media(max-width:700px){.block-container{padding:1.1rem .8rem 2rem}.stMetric{padding:12px!important}}
 </style>""", unsafe_allow_html=True)
 initialize()
 
 def money(minor): return f"₹{minor/100:,.2f}"
+
+def notify_success(message):
+    st.session_state["aureli_notice"]=message
+    st.rerun()
+
+notice=st.session_state.pop("aureli_notice",None)
+if notice: st.success(notice)
 
 def login_screen():
     st.markdown("# ✦ Aureli")
@@ -87,7 +102,7 @@ def page_header(title, subtitle):
 
 if page=="Dashboard":
     page_header("Your financial overview", "A clear view of the money you have recorded.")
-    summary=monthly_summary(uid); loan_rows=user_loans(uid); goal_rows=goals(uid)
+    summary=monthly_summary(uid); loan_rows=user_loans(uid); goal_rows=goals_with_progress(uid)
     loan_total=sum(loan_balance(uid,r["id"]) or 0 for r in loan_rows)
     c1,c2,c3,c4=st.columns(4)
     c1.metric("Income this month",money(summary["income"])); c2.metric("Expenses this month",money(summary["expenses"]))
@@ -100,25 +115,32 @@ if page=="Dashboard":
         for t in tx:
             m=t["occurred_on"][:7]; months.setdefault(m,{"income":0,"expense":0}); months[m][t["kind"]]+=t["amount_minor"]
         labels=sorted(months)[-6:]
-        fig=go.Figure()
-        fig.add_bar(name="Income",x=labels,y=[months[m]["income"]/100 for m in labels],marker_color="#3bc6a5")
-        fig.add_bar(name="Expenses",x=labels,y=[months[m]["expense"]/100 for m in labels],marker_color="#ed8a74")
-        fig.update_layout(barmode="group",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",font_color="#d9e9e3",yaxis_title="INR",legend_orientation="h",margin=dict(l=10,r=10,t=20,b=10))
-        st.plotly_chart(fig,use_container_width=True)
+        if labels:
+            display_labels=[date.fromisoformat(f"{month}-01").strftime("%b %Y") for month in labels]
+            fig=go.Figure()
+            fig.add_bar(name="Income",x=display_labels,y=[months[m]["income"]/100 for m in labels],marker_color="#58d6b1")
+            fig.add_bar(name="Expenses",x=display_labels,y=[months[m]["expense"]/100 for m in labels],marker_color="#e89581")
+            fig.update_layout(barmode="group",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",font_color="#d9e9e3",yaxis_title="INR",legend_orientation="h",margin=dict(l=10,r=10,t=20,b=10),xaxis=dict(type="category",title=None),yaxis=dict(tickprefix="₹",gridcolor="#1a343c"),font=dict(family="Inter, sans-serif"))
+            st.plotly_chart(fig,use_container_width=True)
+        else:
+            st.info("Your cash-flow story will appear here after you record income or expenses.")
     with right:
         st.subheader("Savings goals")
         if goal_rows:
             for g in goal_rows:
-                ratio=min(g["saved_minor"]/g["target_minor"],1)
-                st.write(f"**{g['name']}** · {money(g['saved_minor'])} of {money(g['target_minor'])}")
+                ratio=min(g["total_saved_minor"]/g["target_minor"],1)
+                st.write(f"**{g['name']}** · {money(g['total_saved_minor'])} of {money(g['target_minor'])}")
                 st.progress(ratio)
         else: st.info("Add a savings goal to track progress here.")
         st.subheader("Budget watch")
         rows=budgets(uid)
         if rows:
             for b in rows:
-                st.write(f"{b['category']} · {money(b['spent_minor'])} / {money(b['monthly_limit_minor'])}")
-                st.progress(min(b['spent_minor']/b['monthly_limit_minor'],1))
+                ratio=b['spent_minor']/b['monthly_limit_minor']
+                remaining=b['monthly_limit_minor']-b['spent_minor']
+                st.write(f"**{b['category']}** · {money(b['spent_minor'])} / {money(b['monthly_limit_minor'])}")
+                st.caption((f"{money(remaining)} remaining" if remaining>=0 else f"Over budget by {money(-remaining)}")+f" · {ratio:.0%} used")
+                st.progress(min(ratio,1.0))
         else: st.caption("No budgets recorded yet.")
     st.subheader("Personal guidance")
     for item in recommendations(uid):
@@ -132,7 +154,7 @@ if page=="Dashboard":
     a.metric("Eligibility model","Ready" if eligibility_ready else "Awaiting authorized training data")
     b.metric("Affordable EMI model","Ready" if emi_ready else "Awaiting authorized training data")
     if not eligibility_ready or not emi_ready:
-        st.caption("No model outputs are shown until Aureli artifacts are trained on a rights-cleared internship dataset.")
+        st.caption("Model estimates appear when their saved, authorized pipelines are available.")
 
 elif page=="Transactions":
     page_header("Transactions","Record income and expenses in one ledger.")
@@ -141,7 +163,7 @@ elif page=="Transactions":
         description=st.text_input("Description"); d,e=st.columns(2); occurred=d.date_input("Date",value=date.today()); recurring=e.checkbox("Recurring")
         submitted=st.form_submit_button("Add transaction")
     if submitted:
-        try: add_transaction(uid,kind,amount,category,description,occurred.isoformat(),recurring); st.success("Transaction saved."); st.rerun()
+        try: add_transaction(uid,kind,amount,category,description,occurred.isoformat(),recurring); notify_success("Transaction saved.")
         except ValueError as exc: st.error(str(exc))
     rows=transactions(uid)
     if rows:
@@ -155,13 +177,15 @@ elif page=="Transactions":
                 a,b,c=st.columns(3); edit_kind=a.selectbox("Type",["expense","income"],index=["expense","income"].index(selected["kind"])); edit_amount=b.number_input("Amount (₹)",min_value=.01,value=selected["amount_minor"]/100); edit_category=c.text_input("Category",value=selected["category"])
                 edit_description=st.text_input("Description",value=selected["description"]); d,e=st.columns(2); edit_date=d.date_input("Date",value=date.fromisoformat(selected["occurred_on"])); edit_recurring=e.checkbox("Recurring",value=bool(selected["recurring"]))
                 if st.form_submit_button("Save changes"):
-                    try: update_transaction(uid,selected["id"],kind=edit_kind,amount=edit_amount,category=edit_category,description=edit_description,occurred_on=edit_date.isoformat(),recurring=edit_recurring); st.success("Transaction updated."); st.rerun()
+                    try: update_transaction(uid,selected["id"],kind=edit_kind,amount=edit_amount,category=edit_category,description=edit_description,occurred_on=edit_date.isoformat(),recurring=edit_recurring); notify_success("Transaction updated.")
                     except ValueError as exc: st.error(str(exc))
         with st.form("delete_transaction"):
-            txid=st.number_input("Transaction ID to remove",min_value=1,step=1); confirm=st.checkbox("I understand this permanently removes this transaction")
-            if st.form_submit_button("Delete transaction"):
-                if confirm and delete_transaction(uid,int(txid)): st.success("Transaction removed."); st.rerun()
-                else: st.error("Confirm the deletion and enter one of your transaction IDs.")
+            delete_ids={int(r["id"]):r for r in rows}
+            chosen=st.selectbox("Choose a transaction",list(delete_ids),format_func=lambda key:f"{delete_ids[key]['occurred_on']} · {delete_ids[key]['kind']} · {delete_ids[key]['category']} · {money(delete_ids[key]['amount_minor'])}",key="delete_tx_select")
+            confirm=st.checkbox("I understand this permanently removes the selected transaction")
+            if st.form_submit_button("Delete selected transaction"):
+                if confirm and delete_transaction(uid,chosen): notify_success("Transaction removed.")
+                else: st.error("Confirm the deletion to continue.")
     else: st.info("No transactions yet. Add your first income or expense above.")
 
 elif page=="Budgets":
@@ -169,51 +193,97 @@ elif page=="Budgets":
     with st.form("budget_form"):
         a,b=st.columns(2); category=a.text_input("Category"); amount=b.number_input("Monthly limit (₹)",min_value=0.01,step=500.0)
         if st.form_submit_button("Save budget"):
-            try: set_budget(uid,category,amount); st.success("Budget saved."); st.rerun()
+            try: set_budget(uid,category,amount); notify_success("Budget saved.")
             except ValueError as exc: st.error(str(exc))
     rows=budgets(uid)
-    if rows: st.dataframe([{"Category":r["category"],"Limit":money(r["monthly_limit_minor"]),"Spent this month":money(r["spent_minor"]),"Remaining":money(r["monthly_limit_minor"]-r["spent_minor"])} for r in rows],use_container_width=True,hide_index=True)
+    if rows:
+        for row in rows:
+            spent=row["spent_minor"]; limit=row["monthly_limit_minor"]; remaining=limit-spent; ratio=spent/limit
+            with st.container(border=True):
+                left,right=st.columns([3,1]); left.markdown(f"**{row['category']}**"); right.markdown(f"**{ratio:.0%} used**")
+                st.progress(min(ratio,1.0))
+                st.caption(f"Spent {money(spent)} of {money(limit)} · "+(f"{money(remaining)} remaining" if remaining>=0 else f"overspent by {money(-remaining)}"))
     else: st.info("Create a budget to start tracking category spending.")
     if rows:
         with st.form("budget_delete"):
             category=st.selectbox("Budget to remove",[r["category"] for r in rows])
             if st.form_submit_button("Remove budget"):
-                delete_budget(uid,category); st.success("Budget removed."); st.rerun()
+                delete_budget(uid,category); notify_success("Budget removed.")
 
 elif page=="Loans & EMIs":
     page_header("Loans & EMIs","Save loans and use the same amortization service for payment and interest estimates.")
-    with st.form("loan_form"):
-        a,b,c=st.columns(3); name=a.text_input("Loan name"); principal=b.number_input("Principal (₹)",min_value=1.0,step=10000.0); rate=c.number_input("Annual interest rate (%)",min_value=0.0,step=0.25)
-        d,e,f=st.columns(3); months=d.number_input("Term (months)",min_value=1,max_value=600,value=60); start=e.date_input("Start date",value=date.today()); extra=f.number_input("Extra monthly principal (₹)",min_value=0.0,step=500.0)
-        if st.form_submit_button("Add loan"):
-            if not name.strip(): st.error("Loan name is required.")
+    with st.container(border=True):
+        st.subheader("Plan a new loan")
+        a,b,c=st.columns(3); name=a.text_input("Loan name",placeholder="Home, vehicle, education…",key="new_loan_name"); principal=b.number_input("Principal (₹)",min_value=1.0,value=100000.0,step=10000.0,key="new_loan_principal"); rate=c.number_input("Annual interest (%)",min_value=0.0,value=12.0,step=.25,key="new_loan_rate")
+        d,e,f=st.columns(3); months=d.number_input("Duration (months)",min_value=1,max_value=600,value=12,key="new_loan_months"); start=e.date_input("Start date",value=date.today(),key="new_loan_start"); extra=f.number_input("Optional extra principal/month (₹)",min_value=0.0,value=0.0,step=500.0,key="new_loan_extra")
+        preview=loan_summary(principal,rate,months,extra)
+        p1,p2,p3,p4=st.columns(4); p1.metric("Estimated monthly payment",f"₹{preview['emi']:,.2f}"); p2.metric("Total repayment",f"₹{preview['total_paid']:,.2f}"); p3.metric("Total interest",f"₹{preview['total_interest']:,.2f}"); p4.metric("Payoff duration",f"{preview['months']} months")
+        st.caption("EMI is your estimated fixed monthly installment. Total interest is the estimated borrowing cost over this schedule. Actual lender fees, dates and rounding may differ.")
+        if st.button("Save this loan",type="primary",use_container_width=False):
+            if not name.strip(): st.error("Add a name so you can recognize this loan later.")
             else:
-                try: save_loan(uid,name,principal,rate,months,start.isoformat(),extra); st.success("Loan saved."); st.rerun()
+                try: save_loan(uid,name,principal,rate,months,start.isoformat(),extra); notify_success("Loan saved. Review the schedule below.")
                 except ValueError as exc: st.error(str(exc))
     rows=user_loans(uid)
     if rows:
         for loan in rows:
             with st.expander(f"{loan['name']} · {money(loan['principal_minor'])}"):
                 outstanding=loan_balance(uid,loan["id"])
-                result=loan_summary(Decimal(outstanding)/100,loan["annual_rate"],loan["term_months"],Decimal(loan["extra_payment_minor"])/100) if outstanding else {"emi":Decimal(0),"total_interest":Decimal(0),"months":0,"schedule":[]}
-                a,b,c=st.columns(3); a.metric("Estimated monthly payment",f"₹{result['emi']:,.2f}"); b.metric("Total interest",f"₹{result['total_interest']:,.2f}"); c.metric("Payoff term",f"{result['months']} months")
-                st.caption(f"Recorded principal outstanding: {money(outstanding)} · initial principal: {money(loan['principal_minor'])}")
+                start_date=date.fromisoformat(loan["start_date"])
+                elapsed=max(0,(date.today().year-start_date.year)*12+date.today().month-start_date.month)
+                remaining_term=max(1,int(loan["term_months"])-elapsed)
+                result=loan_summary(Decimal(outstanding)/100,loan["annual_rate"],remaining_term,Decimal(loan["extra_payment_minor"])/100) if outstanding else {"emi":Decimal(0),"total_interest":Decimal(0),"months":0,"schedule":[]}
+                a,b,c=st.columns(3); a.metric("Estimated monthly payment",f"₹{result['emi']:,.2f}"); b.metric("Estimated remaining interest",f"₹{result['total_interest']:,.2f}"); c.metric("Estimated payoff time",f"{result['months']} months")
+                progress=1-outstanding/max(1,loan["principal_minor"])
+                st.progress(max(0.0,min(progress,1.0)))
+                st.caption(f"Recorded principal outstanding: {money(outstanding)} · initial principal: {money(loan['principal_minor'])} · estimated remaining term: {remaining_term} months. Payment estimates use the original contract rate and remaining term; confirm actual figures with your lender.")
                 st.dataframe([{"Month":x["period"],"Payment":f"₹{x['payment']:,.2f}","Principal":f"₹{x['principal']:,.2f}","Interest":f"₹{x['interest']:,.2f}","Balance":f"₹{x['balance']:,.2f}"} for x in result["schedule"]],use_container_width=True,hide_index=True)
-                with st.form(f"payment_{loan['id']}"):
-                    st.markdown("**Record a payment** (enter the principal component shown by your lender)")
-                    pa,pb,pc=st.columns(3); total_paid=pa.number_input("Total payment (₹)",min_value=0.01,step=500.0,key=f"pay_total_{loan['id']}")
-                    principal_paid=pb.number_input("Principal paid (₹)",min_value=0.0,max_value=total_paid,step=500.0,key=f"pay_principal_{loan['id']}")
-                    paid_date=pc.date_input("Paid on",value=date.today(),key=f"pay_date_{loan['id']}")
-                    note=st.text_input("Note",key=f"pay_note_{loan['id']}")
-                    if st.form_submit_button("Save payment"):
-                        try: record_loan_payment(uid,loan["id"],total_paid,principal_paid,paid_date.isoformat(),note); st.success("Payment recorded."); st.rerun()
+                if result["schedule"]:
+                    composition=go.Figure(); composition.add_bar(name="Principal",x=[f"Month {x['period']}" for x in result["schedule"]],y=[float(x["principal"]) for x in result["schedule"]],marker_color="#58d6b1"); composition.add_bar(name="Interest",x=[f"Month {x['period']}" for x in result["schedule"]],y=[float(x["interest"]) for x in result["schedule"]],marker_color="#e89581"); composition.update_layout(barmode="stack",title="Payment breakdown",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",font_color="#d9e9e3",yaxis_title="INR",margin=dict(l=10,r=10,t=40,b=10),yaxis=dict(tickprefix="₹",gridcolor="#1a343c")); st.plotly_chart(composition,use_container_width=True)
+                payment_version=st.session_state.get(f"pay_version_{loan['id']}",0)
+                payment_type=st.selectbox("Payment type",["scheduled","extra_principal"],format_func=lambda x:"Scheduled payment" if x=="scheduled" else "Extra principal payment",key=f"pay_type_{loan['id']}")
+                if payment_type=="scheduled":
+                    default_total=float(result["schedule"][0]["payment"]) if result["schedule"] else 1.0
+                    default_principal=float(result["schedule"][0]["principal"]) if result["schedule"] else 1.0
+                    payment_help="Use the total and principal amounts shown on your lender statement. Aureli pre-fills an estimate for convenience."
+                else:
+                    default_total=1000.0; default_principal=default_total
+                    payment_help="Extra principal payments reduce balance. Confirm the amount your lender applies to principal."
+                st.caption(payment_help)
+                with st.form(f"payment_{loan['id']}_{payment_type}_{payment_version}"):
+                    pa,pb,pc=st.columns(3)
+                    total_paid=pa.number_input("Total paid (₹)",min_value=0.01,value=max(default_total,.01),step=500.0,key=f"pay_total_{loan['id']}_{payment_type}_{payment_version}")
+                    principal_paid=pb.number_input("Principal component (₹)",min_value=0.0,max_value=float(total_paid),value=min(default_principal,float(total_paid)),step=500.0,key=f"pay_principal_{loan['id']}_{payment_type}_{payment_version}")
+                    paid_date=pc.date_input("Paid on",value=date.today(),key=f"pay_date_{loan['id']}_{payment_type}_{payment_version}")
+                    note=st.text_input("Lender reference or note",key=f"pay_note_{loan['id']}_{payment_type}_{payment_version}")
+                    st.caption(f"Expected outstanding after this payment: {money(max(0,outstanding-int(Decimal(str(principal_paid))*100)))}")
+                    if st.form_submit_button("Record payment",type="primary"):
+                        try:
+                            record_loan_payment(uid,loan["id"],total_paid,principal_paid,paid_date.isoformat(),note,payment_type)
+                            st.session_state[f"pay_version_{loan['id']}"]=payment_version+1
+                            notify_success(f"{('Scheduled' if payment_type=='scheduled' else 'Extra principal')} payment recorded successfully.")
                         except ValueError as exc: st.error(str(exc))
                 history=loan_payment_history(uid,loan["id"])
                 if history: st.dataframe([{"Date":x["paid_on"],"Type":x["payment_type"],"Total":money(x["amount_minor"]),"Principal":money(x["principal_minor"]),"Interest":money(x["interest_minor"]),"Note":x["note"]} for x in history],use_container_width=True,hide_index=True)
     else: st.info("Add a loan to see its payment schedule.")
-    with st.expander("Compare a repayment scenario"):
-        p=st.number_input("Scenario principal (₹)",min_value=1.0,value=500000.0); r=st.number_input("Scenario rate (%)",min_value=0.0,value=9.0); n=st.number_input("Scenario term (months)",min_value=1,value=60); x=st.number_input("Extra principal/month (₹)",min_value=0.0,value=0.0)
-        outcome=loan_summary(p,r,n,x); st.write(f"Estimated payment: **₹{outcome['emi']:,.2f}** · interest: **₹{outcome['total_interest']:,.2f}** · payoff: **{outcome['months']} months**")
+    with st.expander("Compare a repayment scenario",expanded=bool(rows)):
+        labels={f"{r['name']} · {money(loan_balance(uid,r['id']))} outstanding · {r['annual_rate']}%":r for r in rows if loan_balance(uid,r['id'])>0}
+        choices=["Custom scenario",*labels]
+        selected=st.selectbox("Baseline loan",choices,key="scenario_baseline")
+        if selected!="Custom scenario":
+            baseline_loan=labels[selected]; base_principal=loan_balance(uid,baseline_loan["id"])/100
+            base_rate=float(baseline_loan["annual_rate"]); base_months=int(baseline_loan["term_months"])
+        else: baseline_loan=None; base_principal=500000.0; base_rate=9.0; base_months=60
+        col1,col2=st.columns(2)
+        scenario_key="custom" if baseline_loan is None else str(baseline_loan["id"])
+        p=col1.number_input("Baseline principal (₹)",min_value=1.0,value=float(base_principal),step=10000.0,key=f"scenario_principal_{scenario_key}")
+        r=col2.number_input("Annual interest (%)",min_value=0.0,value=float(base_rate),step=.25,key=f"scenario_rate_{scenario_key}")
+        n=col1.number_input("Remaining term (months)",min_value=1,max_value=600,value=max(1,min(600,base_months)),key=f"scenario_months_{scenario_key}")
+        x=col2.number_input("Additional principal per month (₹)",min_value=0.0,step=500.0,key=f"scenario_extra_{scenario_key}")
+        before=loan_summary(p,r,n); after=loan_summary(p,r,n,x)
+        a,b,c=st.columns(3); a.metric("Interest saved",f"₹{before['total_interest']-after['total_interest']:,.2f}"); b.metric("Months saved",f"{before['months']-after['months']}"); c.metric("New payoff time",f"{after['months']} months")
+        fig=go.Figure(); fig.add_bar(name="Baseline interest",x=["Current plan"],y=[float(before["total_interest"])]); fig.add_bar(name="With extra principal",x=["Accelerated plan"],y=[float(after["total_interest"])]); fig.update_layout(title="Estimated total interest",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",font_color="#d9e9e3",yaxis_title="INR",showlegend=False,margin=dict(l=10,r=10,t=40,b=10),yaxis=dict(tickprefix="₹",gridcolor="#1a343c")); st.plotly_chart(fig,use_container_width=True)
+        st.caption("This comparison is hypothetical and does not change loan balances or payment history.")
     if len(rows)>1:
         st.subheader("Debt strategies")
         extra_budget=st.number_input("Extra amount available across loans each month (₹)",min_value=0.0,step=500.0,key="strategy_extra")
@@ -232,7 +302,7 @@ elif page=="Savings Goals":
         due=st.date_input("Target date",value=None)
         if st.form_submit_button("Create goal"):
             if not name.strip(): st.error("Goal name is required.")
-            else: add_goal(uid,name,target,saved,due.isoformat() if due else None); st.success("Goal created."); st.rerun()
+            else: add_goal(uid,name,target,saved,due.isoformat() if due else None); notify_success("Goal created.")
     rows=goals_with_progress(uid)
     if rows:
         for g in rows:
@@ -244,7 +314,7 @@ elif page=="Savings Goals":
                     contributed=st.date_input("Date",value=date.today(),key=f"goal_date_{g['id']}")
                     note=st.text_input("Note",key=f"goal_note_{g['id']}")
                     if st.form_submit_button("Record contribution"):
-                        try: contribute_to_goal(uid,g["id"],amount,contributed.isoformat(),note); st.success("Contribution saved."); st.rerun()
+                        try: contribute_to_goal(uid,g["id"],amount,contributed.isoformat(),note); notify_success("Contribution saved.")
                         except ValueError as exc: st.error(str(exc))
                 history=goal_contributions(uid,g["id"])
                 if history: st.dataframe([{"Date":x["contributed_on"],"Amount":money(x["amount_minor"]),"Note":x["note"]} for x in history],use_container_width=True,hide_index=True)
@@ -252,10 +322,10 @@ elif page=="Savings Goals":
                     new_name=st.text_input("Goal name",value=g["name"],key=f"goal_name_{g['id']}")
                     new_target=st.number_input("Target (₹)",min_value=1.0,value=g["target_minor"]/100,key=f"goal_target_{g['id']}")
                     if st.form_submit_button("Update goal"):
-                        try: update_goal(uid,g["id"],name=new_name,target=new_target,due_on=g["due_on"]); st.success("Goal updated."); st.rerun()
+                        try: update_goal(uid,g["id"],name=new_name,target=new_target,due_on=g["due_on"]); notify_success("Goal updated.")
                         except ValueError as exc: st.error(str(exc))
                 if st.button("Delete goal",key=f"goal_delete_{g['id']}"):
-                    if delete_goal(uid,g["id"]): st.success("Goal deleted."); st.rerun()
+                    if delete_goal(uid,g["id"]): notify_success("Goal deleted.")
     else: st.info("No goals yet. Set a target and optional date to get started.")
 
 elif page=="AI Assessment":
@@ -268,25 +338,41 @@ elif page=="AI Assessment":
             continue
         try: artifact=load_artifact(target)
         except Exception as exc: st.error(f"Could not load {title} artifact: {exc}"); continue
-        with st.expander(title,expanded=True):
+        with st.container(border=True):
+            st.subheader(title)
+            feature_columns=artifact.get("input_feature_columns",artifact["feature_columns"])
+            groups={"Income & work":[],"Loan request":[],"Monthly commitments":[],"Credit & reserves":[],"Personal profile":[]}
+            for feature in feature_columns:
+                key=feature.casefold()
+                if any(term in key for term in ("salary","income","employment","occupation","job")): group="Income & work"
+                elif any(term in key for term in ("requested","loan_amount","loan_term","tenure","interest_rate")): group="Loan request"
+                elif any(term in key for term in ("expense","emi","rent","groceries","travel","utility","bill","spending")): group="Monthly commitments"
+                elif any(term in key for term in ("credit","bank_balance","bank_balance","savings","fund","account")): group="Credit & reserves"
+                else: group="Personal profile"
+                groups[group].append(feature)
+            st.caption("Enter the details you know. Blank fields use values imputed by the saved training pipeline; review every field before interpreting a result.")
             with st.form(f"predict_{target}"):
-                values={}; c1,c2=st.columns(2)
-                for index,feature in enumerate(artifact.get("input_feature_columns",artifact["feature_columns"])):
-                    col=c1 if index%2==0 else c2
-                    if feature in artifact.get("input_numeric_features",artifact["numeric_features"]):
-                        raw=col.text_input(feature,placeholder="Leave blank to use the trained median",key=f"input_{target}_{feature}")
-                        values[feature]=raw if raw.strip() else None
-                    else:
-                        options=artifact.get("input_categorical_values",{}).get(feature,[])
-                        if options and len(options)<=50:
-                            selected=col.selectbox(feature,["(Use trained mode)",*options],key=f"input_{target}_{feature}")
-                            values[feature]=None if selected=="(Use trained mode)" else selected
-                        else:
-                            raw=col.text_input(feature,placeholder="Leave blank to use the trained mode",key=f"input_{target}_{feature}")
-                            values[feature]=raw if raw.strip() else None
-                submitted=st.form_submit_button("Predict")
+                values={}; sections=st.tabs(list(groups))
+                for section,group_name in zip(sections,groups):
+                    with section:
+                        for index,feature in enumerate(groups[group_name]):
+                            numeric=feature in artifact.get("input_numeric_features",artifact["numeric_features"])
+                            label=feature.replace("_"," ").strip().title()
+                            help_text={"monthly_salary":"Your gross or take-home monthly income, matching the dataset definition.","requested_amount":"The amount you are considering borrowing.","credit_score":"Enter your reported score if known; do not guess.","monthly_rent":"Your monthly rent or housing cost.","bank_balance":"Current bank balance, in rupees.","current_emi_amount":"Total existing monthly loan installments."}.get(feature)
+                            if numeric:
+                                raw=section.text_input(label,placeholder="Optional · uses model preprocessing if blank",key=f"input_{target}_{feature}",help=help_text)
+                                values[feature]=raw if raw.strip() else None
+                            else:
+                                options=artifact.get("input_categorical_values",{}).get(feature,[])
+                                if options and len(options)<=50:
+                                    selected=section.selectbox(label,["(Use training default)",*options],key=f"input_{target}_{feature}",help=help_text)
+                                    values[feature]=None if selected=="(Use training default)" else selected
+                                else:
+                                    raw=section.text_input(label,placeholder="Optional · uses model preprocessing if blank",key=f"input_{target}_{feature}",help=help_text)
+                                    values[feature]=raw if raw.strip() else None
+                submitted=st.form_submit_button("Predict with saved Aureli model",type="primary")
             if submitted:
-                if not any(value not in (None,"") for value in values.values()): st.error("Enter at least one financial value before predicting.")
+                if not any(value not in (None,"") for value in values.values()): st.error("Enter at least one financial detail before predicting.")
                 else:
                     try:
                         result=predict(target,values)
@@ -300,8 +386,9 @@ elif page=="AI Assessment":
                                 st.caption(f"Estimate was bounded to the range observed in training: ₹{result['observed_target_range'][0]:,.2f}–₹{result['observed_target_range'][1]:,.2f}.")
                         st.caption(f"Model: {result['model_name']} · dataset fingerprint: {result['dataset_sha256'][:12]}")
                         explanation=explain_prediction(target,values)
-                        st.markdown(f"**Explanation method:** {explanation['method']}")
+                        st.markdown(f"**Why this estimate?** {explanation['method']}")
                         if explanation["features"]: st.dataframe(explanation["features"],hide_index=True)
+                        st.info("Use this as an educational estimate only. It does not assess your full financial circumstances or make a credit decision.")
                     except Exception as exc: st.error(f"Prediction could not be produced: {exc}")
 
 elif page=="Model Laboratory":
@@ -311,8 +398,16 @@ elif page=="Model Laboratory":
         import pandas as pd
         table=pd.read_csv(comparison)
         st.subheader("Six-model comparison")
-        st.dataframe(table,use_container_width=True,hide_index=True)
-        st.caption("Test metrics use a held-out test set. Classification selection is by validation macro F1; regression selection is by validation RMSE.")
+        classification=table[table["task"]=="classification"]
+        regression=table[table["task"]=="regression"]
+        model_tabs=st.tabs(["Eligibility classification","Maximum EMI regression"])
+        with model_tabs[0]:
+            columns={"model":"Model","accuracy":"Test accuracy","macro_f1":"Macro F1","weighted_f1":"Weighted F1","roc_auc_ovr_macro":"Macro ROC AUC","multiclass_brier_score":"Brier score","log_loss":"Log loss","expected_calibration_error_10_bins":"Calibration error"}
+            st.dataframe(classification[list(columns)].rename(columns=columns).round(4),use_container_width=True,hide_index=True)
+        with model_tabs[1]:
+            columns={"model":"Model","mae":"Test MAE (₹)","rmse":"Test RMSE (₹)","r2":"Test R²"}
+            st.dataframe(regression[list(columns)].rename(columns=columns).round(3),use_container_width=True,hide_index=True)
+        st.caption("Metrics are from an untouched held-out test set. Classification selection is by validation macro F1; regression selection is by validation RMSE.")
         candidates=table[table.get("evaluation_path",pd.Series(index=table.index,dtype=object)).notna()] if "evaluation_path" in table else pd.DataFrame()
         if not candidates.empty:
             selected=st.selectbox("Evaluation artifact",candidates.to_dict("records"),format_func=lambda r:f"{r['target']} · {r['model']}")
@@ -322,7 +417,9 @@ elif page=="Model Laboratory":
                 plot_path=evaluation/filename
                 if plot_path.is_file():
                     st.markdown(f"**{filename.replace('_',' ').replace('.html','').title()}**")
-                    st.components.v1.html(plot_path.read_text(encoding="utf-8"),height=500,scrolling=True)
+                    html=plot_path.read_text(encoding="utf-8")
+                    theme_script="""<script>(function(){function applyAureliTheme(){if(!window.Plotly)return;var plots=document.querySelectorAll('.js-plotly-plot');if(!plots.length){setTimeout(applyAureliTheme,80);return;}plots.forEach(function(plot){Plotly.relayout(plot,{'paper_bgcolor':'rgba(0,0,0,0)','plot_bgcolor':'#10242d','font.color':'#d9e9e3','xaxis.gridcolor':'#244149','yaxis.gridcolor':'#244149','xaxis.zerolinecolor':'#466169','yaxis.zerolinecolor':'#466169'});});}setTimeout(applyAureliTheme,200);})();</script>"""
+                    st.components.v1.html(html.replace("</body>",theme_script+"</body>"),height=500,scrolling=True)
     else:
         st.info("No Aureli experiment results have been recorded yet. The authorized company dataset is available locally; run the documented six-model training command to create the experiments and artifacts.")
     for target,title in [("emi_eligibility","Classification"),("max_monthly_emi","Regression")]:
@@ -410,7 +507,7 @@ else:
     with st.form("category_form"):
         name=st.text_input("Category name"); kind=st.selectbox("Category type",["expense","income"])
         if st.form_submit_button("Add category"):
-            try: add_category(uid,name,kind); st.success("Category saved."); st.rerun()
+            try: add_category(uid,name,kind); notify_success("Category saved.")
             except ValueError as exc: st.error(str(exc))
     cats=categories(uid)
     if cats: st.dataframe([{"Name":x["name"],"Type":x["kind"]} for x in cats],use_container_width=True,hide_index=True)
@@ -419,7 +516,7 @@ else:
         a,b,c=st.columns(3); obligation=a.text_input("Name"); cat=b.text_input("Category"); amount=c.number_input("Monthly amount (₹)",min_value=.01,step=100.0)
         due_day=st.number_input("Due day",min_value=1,max_value=31,value=1)
         if st.form_submit_button("Add recurring obligation"):
-            try: add_recurring_obligation(uid,obligation,cat,amount,due_day); st.success("Obligation saved."); st.rerun()
+            try: add_recurring_obligation(uid,obligation,cat,amount,due_day); notify_success("Obligation saved.")
             except ValueError as exc: st.error(str(exc))
     obligations=recurring_obligations(uid,active_only=False)
     if obligations:

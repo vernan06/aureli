@@ -1,8 +1,8 @@
 # Aureli
 
-**Your personal financial intelligence.** One local Streamlit application for EMI modeling, personal cash flow, budgets, savings goals, loans, simulations, and reports.
+**Your personal financial intelligence.** Aureli brings transactions, budgets, savings, debt planning, financial scenarios, reports and educational EMI estimates into one local Streamlit application.
 
-## Run locally
+## Launch locally
 
 Requires Python 3.12. From this repository root:
 
@@ -13,38 +13,64 @@ python -m pip install -r requirements.txt -r requirements-training.txt
 streamlit run streamlit_app.py
 ```
 
-The app offers account creation and a temporary guest demo. SQLite defaults to `data/aureli.sqlite3`; set `AURELI_DB_PATH` to another private path when needed. Guest demo records are deleted when the guest session ends. Never commit the local database.
+Aureli opens with account creation, sign-in or a temporary guest demonstration. A local SQLite database defaults to `data/aureli.sqlite3`; set `AURELI_DB_PATH` to use a different private path. Guest records are scoped and deleted when ending the guest session. Do not commit local account databases.
 
-## Architecture
+## Product areas
 
-- `streamlit_app.py` is the only UI entrypoint. It presents Overview, EMI Prediction, Model Laboratory, Loan Simulator, and Financial Planner sections.
-- `aureli/auth` provides one PBKDF2 password authentication system.
-- `aureli/persistence` owns SQLite schema creation and connection settings.
-- `aureli/finance` owns integer-paise transactions, categories, budgets, recurring obligations, savings goals, and profiles.
-- `aureli/loans` owns Decimal amortization, payment history, principal balances, and snowball/avalanche comparisons.
-- `aureli/intelligence` owns stored-fact recommendations, cash-flow summaries, and non-mutating plan scenarios.
-- `aureli/ml` owns leakage-safe preprocessing, the six estimator workflows, local MLflow tracking, persisted artifacts, and inference.
-- Stored money uses integer paise; loan math uses Decimal and rounds each scheduled payment to paise.
-- Records are scoped to the signed-in user in every data query.
+- **Overview:** current-month income, expenses and surplus, recorded loan balance, cash-flow chart, savings progress, budget utilization and contextual guidance.
+- **EMI Prediction:** guided input groups, saved-model estimates for `emi_eligibility` and `max_monthly_emi`, model-output probabilities where supported, and feature explanations.
+- **Model Laboratory:** all six model comparisons, real held-out metrics, evaluation plots, MLflow runs, preprocessing summary and known limitations.
+- **Loan Simulator:** live loan estimates, amortization schedule, principal/interest breakdown, payment history, duplicate/placeholder safeguards, saved-loan repayment scenarios and snowball/avalanche strategies.
+- **Financial Planner:** transactions, budgets, savings goals, non-mutating financial twin, CSV reports and profile/recurring settings.
 
-New accounts start empty. Guest mode is also empty and uses ordinary user-scoped records. The company-provided dataset at `C:\Users\verna\Downloads\emi_prediction_dataset.csv` is authorized by the user for this internship project. The vendor clone and its copies are not used. Training outputs are local and ignored by Git.
+All personal finance queries are scoped to the signed-in account. Stored money uses integer paise; fixed-rate amortization uses `Decimal` and rounds each scheduled payment to paise. Hypothetical scenarios do not change actual records.
+
+## Models and data
+
+The company-provided dataset at `C:\Users\verna\Downloads\emi_prediction_dataset.csv` was authorized by the user for this internship project. The source dataset and trained model artifacts are not included in Git. Actual model metrics, training method, sample design, MLflow experiment IDs and limits are documented in [docs/ML_RESULTS.md](docs/ML_RESULTS.md).
+
+Reproduce the local training run only when you have the authorized CSV at that path:
 
 ```powershell
 python -m aureli.ml.train "C:\Users\verna\Downloads\emi_prediction_dataset.csv" --confirm-data-rights --max-rows 120000 --artifact-dir artifacts/models
 ```
 
-Inspect without training by adding `--inspect-only`. The fit uses a reproducible, proportional stratified sample when valid rows exceed the 120,000-row local memory cap; two-fold cross-validation and modest randomized tuning bound CPU and memory. `--quick` is for pipeline smoke checks only. Training saves artifacts and the data-quality report under `artifacts/models/`, with local MLflow runs under `mlruns/`. Keep generated artifacts and source data private.
+Add `--inspect-only` to audit the file without fitting models. A reproducible, proportional stratified sample is used above the 120,000-row local compute cap. Training writes local artifacts to `artifacts/models/` and MLflow runs to `mlruns/`; these paths are ignored by Git. Model outputs are educational only. High_Risk classification performance is weak and the dataset does not document target-generation rules. Do not use predictions for lending decisions.
 
-## Tests
+## Tests and acceptance
 
-Run the complete local verification suite with the project environment:
+Run the automated suite and local checks:
 
 ```powershell
 python -m unittest discover -s tests -v
+python -m py_compile streamlit_app.py aureli\finance\service.py aureli\loans\service.py aureli\ml\inference.py
+python -m pip check
+git diff --check
 ```
 
-## Streamlit Community Cloud
+See [docs/FEATURE_ACCEPTANCE.md](docs/FEATURE_ACCEPTANCE.md) for coverage and unverified gates, [docs/DEMO_WALKTHROUGH.md](docs/DEMO_WALKTHROUGH.md) for a realistic user journey, and [docs/INTEGRATION_STATUS.md](docs/INTEGRATION_STATUS.md) for local environment results.
 
-For a future deployment, use Python 3.12, `streamlit_app.py`, and both requirements files when MLflow training is needed. Configure durable private storage for user records and model artifacts before accepting real users. Deployment has not been performed.
+### Optional desktop and mobile browser acceptance
 
-No public deployment has been performed or verified.
+The Playwright acceptance script uses its managed Chromium and a disposable SQLite database. In PowerShell, install the test-only browser tooling and start Streamlit in separate terminals:
+
+```powershell
+.venv\Scripts\python.exe -m pip install playwright
+$env:PLAYWRIGHT_BROWSERS_PATH = ".tmp\playwright-browsers"
+.venv\Scripts\python.exe -m playwright install chromium
+$env:AURELI_DB_PATH = ".tmp\browser-acceptance.sqlite3"
+.venv\Scripts\streamlit.exe run streamlit_app.py --server.port 8765
+```
+
+Use the localhost URL printed by Streamlit (the browser acceptance was run at `http://127.0.0.1:8765`) in another terminal:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH = ".tmp\playwright-browsers"
+.venv\Scripts\python.exe tests\browser_acceptance.py --url http://127.0.0.1:8765
+```
+
+The script creates a synthetic test account and saves screenshots in `.tmp\browser-screenshots\`. Keep these local test paths out of Git.
+
+## Deployment
+
+No deployment was performed. The app requires Python 3.12 and local model files for EMI inference. Before hosting, configure durable private storage for user records and model artifacts and validate deployment-specific security, retention and access controls. No paid service or GPU is required by the application code.

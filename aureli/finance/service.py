@@ -1,12 +1,17 @@
 from __future__ import annotations
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from aureli.persistence.db import connect
 
+MAX_MINOR = 9_223_372_036_854_775_807
+
 def to_minor(amount) -> int:
-    value = Decimal(str(amount))
+    try: value = Decimal(str(amount))
+    except (InvalidOperation, TypeError, ValueError) as exc: raise ValueError("Amount must be a positive finite number.") from exc
     if not value.is_finite() or value <= 0: raise ValueError("Amount must be a positive finite number.")
-    return int((value * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    minor=int((value * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    if minor>MAX_MINOR: raise ValueError("Amount is too large to store safely.")
+    return minor
 
 def _category_id(db, user_id: int, category: str, kind: str) -> int:
     name=category.strip()
@@ -59,7 +64,10 @@ def budgets(user_id: int, month: str | None = None):
         return db.execute("SELECT b.category,b.monthly_limit_minor,COALESCE(SUM(t.amount_minor),0) spent_minor FROM budgets b LEFT JOIN transactions t ON t.user_id=b.user_id AND t.category=b.category AND t.kind='expense' AND substr(t.occurred_on,1,7)=? WHERE b.user_id=? GROUP BY b.id ORDER BY b.category",(month,user_id)).fetchall()
 
 def add_goal(user_id: int, name: str, target, saved=0, due_on=None):
-    saved_minor=int((Decimal(str(saved))*100).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
+    try: saved_value=Decimal(str(saved))
+    except (InvalidOperation, TypeError, ValueError) as exc: raise ValueError("Saved amount must be a finite non-negative amount.") from exc
+    if not saved_value.is_finite(): raise ValueError("Saved amount must be a finite non-negative amount.")
+    saved_minor=int((saved_value*100).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
     if not name.strip(): raise ValueError("Goal name is required.")
     if saved_minor < 0 or saved_minor > to_minor(target): raise ValueError("Saved amount must be between zero and the target.")
     if due_on: date.fromisoformat(due_on)
@@ -71,9 +79,13 @@ def goals(user_id: int):
     with connect() as db: return db.execute("SELECT * FROM goals WHERE user_id=? ORDER BY id DESC",(user_id,)).fetchall()
 
 def set_profile(user_id: int, income, emergency):
-    income_minor=int((Decimal(str(income))*100).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
-    emergency_minor=int((Decimal(str(emergency))*100).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
+    try: income_value=Decimal(str(income)); emergency_value=Decimal(str(emergency))
+    except (InvalidOperation, TypeError, ValueError) as exc: raise ValueError("Profile amounts must be finite numbers.") from exc
+    if not income_value.is_finite() or not emergency_value.is_finite(): raise ValueError("Profile amounts must be finite numbers.")
+    income_minor=int((income_value*100).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
+    emergency_minor=int((emergency_value*100).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
     if income_minor<0 or emergency_minor<0: raise ValueError("Profile amounts cannot be negative.")
+    if income_minor>MAX_MINOR or emergency_minor>MAX_MINOR: raise ValueError("Profile amount is too large to store safely.")
     with connect() as db:
         db.execute("UPDATE profiles SET monthly_income_minor=?,emergency_fund_minor=? WHERE user_id=?",(income_minor,emergency_minor,user_id))
 
@@ -121,6 +133,7 @@ def goals_with_progress(user_id: int):
         return db.execute("SELECT g.*,g.saved_minor+COALESCE(SUM(c.amount_minor),0) AS total_saved_minor FROM goals g LEFT JOIN goal_contributions c ON c.goal_id=g.id WHERE g.user_id=? GROUP BY g.id ORDER BY g.id DESC",(user_id,)).fetchall()
 
 def update_goal(user_id: int, goal_id: int, *, name: str, target, due_on=None):
+    if not name.strip(): raise ValueError("Goal name is required.")
     if due_on: date.fromisoformat(due_on)
     target_minor=to_minor(target)
     with connect() as db:

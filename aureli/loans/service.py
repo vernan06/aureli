@@ -1,14 +1,17 @@
 """One authoritative fixed-rate monthly amortization implementation."""
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 CENT=Decimal("0.01")
 def money(value): return Decimal(str(value)).quantize(CENT, rounding=ROUND_HALF_UP)
 
 def amortization_schedule(principal, annual_rate, months, extra_payment=0):
-    balance=money(principal); rate=Decimal(str(annual_rate))/Decimal(1200); n=int(months)
-    extra=money(extra_payment)
-    if balance <= 0 or n < 1 or Decimal(str(annual_rate)) < 0 or extra < 0: raise ValueError("Loan inputs must be positive, with a non-negative rate and extra payment.")
+    try:
+        balance=money(principal); annual=Decimal(str(annual_rate)); month_value=Decimal(str(months)); extra=money(extra_payment)
+    except (InvalidOperation, TypeError, ValueError) as exc: raise ValueError("Enter finite loan amounts, rate, and whole-month term.") from exc
+    if not annual.is_finite() or not month_value.is_finite() or month_value!=month_value.to_integral_value(): raise ValueError("Interest rate must be finite and loan duration must be a whole number of months.")
+    rate=annual/Decimal(1200); n=int(month_value)
+    if balance <= 0 or n < 1 or n>600 or annual < 0 or annual>10000 or extra < 0: raise ValueError("Loan principal must be positive, duration 1–600 months, and rate and extra payment within supported non-negative ranges.")
     payment=money(balance/n) if rate==0 else money(balance*rate/(1-(1+rate)**(-n)))
     rows=[]
     for period in range(1,n+1):
@@ -30,10 +33,13 @@ def save_loan(user_id, name, principal, rate, months, start_date, extra_payment=
     from aureli.persistence.db import connect
     if not name.strip(): raise ValueError("Loan name is required.")
     date.fromisoformat(start_date)
-    annual=Decimal(str(rate))
-    if not annual.is_finite() or annual<0 or int(months)<1: raise ValueError("Enter a valid non-negative rate and a positive term.")
+    try: annual=Decimal(str(rate)); month_value=Decimal(str(months)); extra_value=Decimal(str(extra_payment))
+    except (InvalidOperation,TypeError,ValueError) as exc: raise ValueError("Enter a finite rate, non-negative extra amount, and whole-month term.") from exc
+    if not annual.is_finite() or not month_value.is_finite() or not extra_value.is_finite() or annual<0 or annual>10000 or month_value<1 or month_value!=month_value.to_integral_value() or extra_value<0 or month_value>600: raise ValueError("Enter a rate from 0 to 10,000%, non-negative extra amount, and whole-month term from 1 to 600.")
+    principal_minor=to_minor(principal)
+    extra_minor=int((extra_value*100).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
     with connect() as db:
-        cur=db.execute("INSERT INTO loans(user_id,name,principal_minor,annual_rate,term_months,start_date,extra_payment_minor) VALUES(?,?,?,?,?,?,?)",(user_id,name.strip(),to_minor(principal),float(annual),int(months),start_date,to_minor(extra_payment) if Decimal(str(extra_payment))>0 else 0))
+        cur=db.execute("INSERT INTO loans(user_id,name,principal_minor,annual_rate,term_months,start_date,extra_payment_minor) VALUES(?,?,?,?,?,?,?)",(user_id,name.strip(),principal_minor,float(annual),int(month_value),start_date,extra_minor))
         return cur.lastrowid
 
 def user_loans(user_id):
@@ -50,8 +56,13 @@ def record_loan_payment(user_id: int, loan_id: int, amount, principal_paid, paid
     from aureli.finance.service import to_minor
     from aureli.persistence.db import connect
     date.fromisoformat(paid_on)
-    total=to_minor(amount); principal=to_minor(principal_paid) if Decimal(str(principal_paid))>0 else 0
+    try: principal_value=Decimal(str(principal_paid))
+    except (InvalidOperation,TypeError,ValueError) as exc: raise ValueError("Principal amount must be finite.") from exc
+    if not principal_value.is_finite() or principal_value<0: raise ValueError("Principal amount must be finite and non-negative.")
+    total=to_minor(amount); principal=int((principal_value*100).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
     if payment_type not in {"scheduled","extra_principal"}: raise ValueError("Invalid payment type.")
+    if total < 100: raise ValueError("Enter the actual payment amount; values below ₹1.00 are too small to record.")
+    if principal <= 0: raise ValueError("Enter the principal amount shown by your lender. Zero-principal placeholder payments cannot be recorded.")
     interest=0 if payment_type=="extra_principal" else total-principal
     if principal>total or interest<0: raise ValueError("Principal paid must be between zero and the payment amount.")
     if payment_type=="extra_principal" and principal!=total: raise ValueError("An extra-principal payment must be applied entirely to principal.")
@@ -60,6 +71,9 @@ def record_loan_payment(user_id: int, loan_id: int, amount, principal_paid, paid
         if not loan: raise ValueError("Loan was not found for this account.")
         paid=db.execute("SELECT COALESCE(SUM(principal_minor),0) FROM loan_payments WHERE loan_id=?",(loan_id,)).fetchone()[0]
         if principal>loan["principal_minor"]-paid: raise ValueError("Principal payment exceeds the recorded outstanding balance.")
+        duplicate=db.execute("SELECT 1 FROM loan_payments WHERE loan_id=? AND amount_minor=? AND principal_minor=? AND paid_on=? AND note=? AND payment_type=? LIMIT 1",
+            (loan_id,total,principal,paid_on,note.strip(),payment_type)).fetchone()
+        if duplicate: raise ValueError("This exact payment is already recorded. Check the payment history before submitting again.")
         db.execute("INSERT INTO loan_payments(loan_id,amount_minor,paid_on,note,principal_minor,interest_minor,payment_type) VALUES(?,?,?,?,?,?,?)",(loan_id,total,paid_on,note.strip(),principal,interest,payment_type))
 
 def loan_payment_history(user_id: int, loan_id: int):

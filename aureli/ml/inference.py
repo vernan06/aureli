@@ -1,5 +1,6 @@
 """Validated inference from Aureli's locally saved model pipelines."""
 from pathlib import Path
+from functools import lru_cache
 
 import joblib
 import numpy as np
@@ -12,10 +13,15 @@ def artifact_path(target,model_dir="artifacts/models"):
 def load_artifact(target,model_dir="artifacts/models"):
     path=artifact_path(target,model_dir)
     if not path.is_file(): raise FileNotFoundError(f"No trained Aureli artifact exists for {target}.")
-    artifact=joblib.load(path)
+    artifact=_load_cached(str(path.resolve()),path.stat().st_mtime_ns)
     if artifact.get("target")!=target or not hasattr(artifact.get("pipeline"),"predict"):
         raise ValueError("Saved model artifact is invalid or has a mismatched target.")
     return artifact
+
+@lru_cache(maxsize=4)
+def _load_cached(path,modified_ns):
+    """Load immutable local pipelines once per process, invalidating on artifact change."""
+    return joblib.load(path)
 
 def predict(target,inputs,model_dir="artifacts/models"):
     artifact=load_artifact(target,model_dir)

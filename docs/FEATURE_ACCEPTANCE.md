@@ -1,30 +1,34 @@
 # Aureli feature acceptance
 
-Status reflects local evidence collected on 2026-10-26 with Python 3.12.10. “Verified” means the behavior has automated local test evidence; “partially verified” means only a narrower automated or manual path was exercised; “blocked” identifies an external prerequisite.
+Status reflects automated acceptance evidence collected on 2026-10-26 with Python 3.12.10. “Verified” means an automated local test exercises the behavior; “partially verified” means only part of the journey or a manual path was checked; “blocked” identifies an environmental or product prerequisite.
 
 | Feature | Status | Evidence |
 |---|---|---|
-| Python 3.12 application and one Streamlit entrypoint | Verified | `.venv` is Python 3.12.10; AppTest registers, records a transaction and renders all five sections; current real server health check is recorded in INTEGRATION_STATUS.md. |
-| Password authentication and user isolation | Verified | `tests/test_core.py`: password hashing/authentication and cross-user record-access checks. |
-| Income/expense transactions, categories, edits/deletes | Verified | `tests/test_core.py`: owner-scoped transaction CRUD and integer-paise handling; `tests/test_app.py` adds a transaction through the UI. |
-| Monthly budgets | Verified | `tests/test_core.py`: calculations and owner scope. |
-| Savings goals and contributions | Verified | `tests/test_core.py`: contributions, progress and ownership. |
-| Loan amortization, schedules, payment history and balances | Verified | `tests/test_core.py`: schedule, payment records and principal balance. |
-| Prepayment and snowball/avalanche strategies | Verified | `tests/test_core.py`: payoff changes and strategy calculations without mutation. |
-| Recurring obligations and cash-flow summaries | Verified | `tests/test_core.py`: scoped recurring records and summaries. |
-| Financial twin scenarios | Verified | `tests/test_core.py`: scenario calculations do not persist or mutate saved financial records. |
-| CSV report generation | Partially verified | Report view renders in `tests/test_app.py`; export implementation includes transactions, budgets, goals, loans/payments, recurring obligations and totals. Download bytes are not independently asserted. |
-| Data cleaning and preprocessing | Verified | `tests/test_ml_pipeline.py`: schema, mixed types, missing-value handling and normalization; actual-data audit in `artifacts/models/data_quality_report.md`. |
-| Six model training workflows and MLflow | Verified | Actual company dataset generated six FINISHED MLflow runs and two registered champion versions. Exact IDs/metrics are in `docs/ML_RESULTS.md`; synthetic-fixture mechanics remain covered by `tests/test_ml_pipeline.py`. |
-| Saved preprocessing pipelines and app inference | Verified | Two joblib pipelines and metadata exist under `artifacts/models/`; inference was exercised on a held-out manual input and UI pages render with artifacts. No user prediction should be interpreted as a lending decision. |
-| Classification quality for minority High_Risk class | Partially verified | Held-out metrics are real and reported; selected model precision 0.174 and recall 0.512 are weak. No claim of production suitability. |
-| Regression target generalization | Blocked | Held-out Random Forest R² is 0.9717, but target-generation specification is absent. Company label documentation and external validation are required for production reliance. |
-| Guest demo cleanup | Partially verified | Guest mode is implemented and UI paths render; independent sign-out cleanup assertion is not in the current suite. |
-| Legacy schema/data migration | Partially verified | Versioned idempotent initialization is implemented; no dedicated legacy-schema migration fixture covers every earlier database state. |
-| Deployment readiness | Partially verified | Single entrypoint and dependency manifests are prepared. No deployment occurred; durable hosted private storage and deployment security/retention configuration remain to be selected. |
+| One Streamlit application and five primary sections | Verified | `tests/test_app.py` renders every primary section and each Financial Planner section without exceptions. |
+| Authentication, persistence and account isolation | Verified | `tests/test_core.py` verifies password hashing, authentication, owner-scoped CRUD, unauthorized access rejection and guest account cleanup. |
+| Transactions, income/expenses, edit and safe deletion controls | Verified | Core tests verify CRUD and user boundaries; AppTest enters a transaction. Deletion now selects a displayed user-owned row and does not ask for an internal ID. |
+| Budget utilization, remaining amount and overspend state | Verified | Core test checks spending arithmetic; AppTest confirms the visible remaining amount. |
+| Savings goal totals including contributions | Verified | Core contribution test plus AppTest verifies the same ₹15,000 total on Overview and Savings Goals. |
+| Loan preview, amortization and repayment recording | Verified | Finance regression tests include ₹100,000 at 12% for 12 months: EMI ₹8,884.88; with ₹2,000 extra, 10 months and ₹5,431.07 interest. AppTest verifies payment defaults ₹8,884.88 total / ₹7,884.88 principal and resulting balance. |
+| Placeholder, malformed and duplicate payment rejection | Verified | `tests/test_core.py` rejects ₹0.01/zero-principal placeholders, exact duplicates, malformed amounts, invalid rates and invalid terms. Successful saves rotate the payment form state. |
+| Saved-loan repayment scenarios and multiple-loan strategies | Verified | Core tests verify snowball/avalanche calculations and scenario non-mutation. AppTest confirms a saved loan can be selected as a baseline and interest-saved comparison is displayed. |
+| Financial twin scenarios do not mutate actual records | Verified | `tests/test_core.py` checks hypothetical changes and confirms stored loans remain unchanged. |
+| Cash-flow chart month labels and responsive app styling | Verified | `tests/browser_acceptance.py` exercised the cash-flow chart at desktop and 390px mobile viewport, captured screenshots and found no horizontal overflow. |
+| CSV report generation | Partially verified | Reports page renders with owner-scoped records and provides the export control. Download bytes are not directly asserted by the current suite. |
+| Authorized EMI models and explanations | Verified | AppTest uses the saved production artifacts to run both real model inference forms; malformed input is rejected. Training metrics and limits are in `ML_RESULTS.md`. |
+| Model Laboratory, six-model metrics, plots and MLflow | Verified | AppTest renders the actual six-model comparison and MLflow records from local artifacts/tracking; calibration and residual artifacts are available. |
+| Guest demonstration cleanup | Partially verified | Guest user-scoped cleanup is tested at the service boundary; browser journey uses account signup rather than guest sign-out. |
+| Legacy schema migration compatibility | Partially verified | Idempotent versioned initialization is implemented; no fixture covers every legacy database version. |
+| Live Streamlit startup and browser navigation | Verified | Streamlit reported `http://127.0.0.1:8765`; health endpoint returned HTTP 200. Managed Chromium completed desktop/mobile journeys with no page or console errors. Screenshots are in `.tmp/browser-screenshots/`. |
+| Deployment | Not performed | No deployment was attempted, per instruction. |
 
-Verification command:
+Run verification from the repository root:
 
 ```powershell
 .venv\Scripts\python.exe -m unittest discover -s tests -v
+.venv\Scripts\python.exe -m py_compile streamlit_app.py aureli\finance\service.py aureli\loans\service.py aureli\ml\inference.py
+.venv\Scripts\python.exe -m pip check
+git diff --check
 ```
+
+Optional browser acceptance uses Python Playwright with its managed Chromium. Install it in the virtual environment, install Chromium to a workspace-local cache, start Streamlit with an isolated `AURELI_DB_PATH`, then pass the actual server-reported URL to `tests/browser_acceptance.py`. See the README for commands.

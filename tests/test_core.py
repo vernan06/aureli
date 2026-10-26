@@ -58,6 +58,8 @@ class AureliCoreTests(unittest.TestCase):
 
     def test_money_validation_and_budget_spend(self):
         with self.assertRaises(ValueError): add_transaction(self.user,"expense",0,"Food","","2026-10-01")
+        for invalid in ("nan","inf","not money",-1):
+            with self.subTest(invalid=invalid),self.assertRaises(ValueError): add_transaction(self.user,"expense",invalid,"Food","","2026-10-01")
         add_transaction(self.user,"expense",25,"Food","","2026-10-03")
         set_budget(self.user,"Food",100)
         rows=budgets(self.user)
@@ -91,6 +93,32 @@ class AureliCoreTests(unittest.TestCase):
         self.assertEqual(len(loan_payment_history(self.user,loan)),2)
         self.assertEqual(loan_payment_history(self.other,loan),[])
         with self.assertRaises(ValueError): record_loan_payment(self.other,loan,1000,900,"2026-03-01")
+
+    def test_loan_payment_rejects_placeholder_and_duplicate_submissions(self):
+        loan=save_loan(self.user,"Home",100000,12,12,"2026-01-01")
+        with self.assertRaisesRegex(ValueError,"below ₹1.00"):
+            record_loan_payment(self.user,loan,.01,0,"2026-02-01","First EMI test")
+        with self.assertRaisesRegex(ValueError,"Zero-principal"):
+            record_loan_payment(self.user,loan,8884.88,0,"2026-02-01","First EMI test")
+        record_loan_payment(self.user,loan,8884.88,7884.88,"2026-02-01","First EMI test")
+        with self.assertRaisesRegex(ValueError,"already recorded"):
+            record_loan_payment(self.user,loan,8884.88,7884.88,"2026-02-01","First EMI test")
+        self.assertEqual(len(loan_payment_history(self.user,loan)),1)
+
+    def test_reference_loan_and_accelerated_payoff_rounding(self):
+        regular=loan_summary(100000,12,12)
+        faster=loan_summary(100000,12,12,2000)
+        self.assertEqual(regular["emi"],Decimal("8884.88"))
+        self.assertEqual(regular["months"],12)
+        self.assertEqual(faster["months"],10)
+        self.assertEqual(faster["total_interest"],Decimal("5431.07"))
+        self.assertEqual(loan_summary(1000,0,3)["schedule"][-1]["balance"],0)
+
+    def test_loan_inputs_reject_nonfinite_negative_and_fractional_terms(self):
+        for rate,months in ((-1,12),("nan",12),(12,0),(12,1.5),(12,601)):
+            with self.subTest(rate=rate,months=months),self.assertRaises(ValueError): loan_summary(100000,rate,months)
+        for rate,months in ((-1,12),("inf",12),(12,1.2),(12,601)):
+            with self.subTest(rate=rate,months=months),self.assertRaises(ValueError): save_loan(self.user,"Invalid loan",1000,rate,months,"2026-10-01")
 
     def test_snowball_avalanche_and_what_if_are_non_mutating(self):
         small=save_loan(self.user,"Small high rate",10000,18,24,"2026-01-01")
