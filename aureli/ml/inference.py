@@ -5,11 +5,11 @@ import joblib
 import numpy as np
 import pandas as pd
 
-def artifact_path(target,model_dir="models"):
+def artifact_path(target,model_dir="artifacts/models"):
     if target not in {"emi_eligibility","max_monthly_emi"}: raise ValueError("Unknown Aureli prediction target.")
     return Path(model_dir)/f"{target}.joblib"
 
-def load_artifact(target,model_dir="models"):
+def load_artifact(target,model_dir="artifacts/models"):
     path=artifact_path(target,model_dir)
     if not path.is_file(): raise FileNotFoundError(f"No trained Aureli artifact exists for {target}.")
     artifact=joblib.load(path)
@@ -17,7 +17,7 @@ def load_artifact(target,model_dir="models"):
         raise ValueError("Saved model artifact is invalid or has a mismatched target.")
     return artifact
 
-def predict(target,inputs,model_dir="models"):
+def predict(target,inputs,model_dir="artifacts/models"):
     artifact=load_artifact(target,model_dir)
     input_columns=artifact.get("input_feature_columns",artifact["feature_columns"])
     missing=[name for name in input_columns if name not in inputs]
@@ -46,10 +46,12 @@ def predict(target,inputs,model_dir="models"):
                 "model_name":artifact["model_name"],"dataset_sha256":artifact["dataset_sha256"]}
     numeric=float(value)
     if not np.isfinite(numeric): raise ValueError("Model returned a non-finite affordable EMI value.")
-    return {"target":target,"prediction":max(0.0,numeric),"model_name":artifact["model_name"],
-            "dataset_sha256":artifact["dataset_sha256"]}
+    low=float(artifact.get("target_min",0.0)); high=float(artifact.get("target_max",float("inf")))
+    bounded=min(max(numeric,low),high)
+    return {"target":target,"prediction":bounded,"unbounded_prediction":numeric,"range_limited":bounded!=numeric,
+            "observed_target_range":[low,high],"model_name":artifact["model_name"],"dataset_sha256":artifact["dataset_sha256"]}
 
-def global_explanations(target,model_dir="models",limit=20):
+def global_explanations(target,model_dir="artifacts/models",limit=20):
     artifact=load_artifact(target,model_dir)
     # The model's registered metadata includes permutation-independent tree or
     # linear importance computed on the transformed training features.
@@ -58,7 +60,7 @@ def global_explanations(target,model_dir="models",limit=20):
     meta=json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     return meta.get("feature_importance",[])[:limit]
 
-def explain_prediction(target,inputs,model_dir="models",limit=12):
+def explain_prediction(target,inputs,model_dir="artifacts/models",limit=12):
     artifact=load_artifact(target,model_dir)
     input_columns=artifact.get("input_feature_columns",artifact["feature_columns"])
     from aureli.ml.pipeline import _engineer

@@ -8,6 +8,7 @@ import pandas as pd
 from mlflow.tracking import MlflowClient
 
 from aureli.ml.inference import load_artifact, predict
+from aureli.ml.pipeline import _clean_frame,_deps,_engineer,_metrics
 from aureli.ml.training import inspect_dataset, train_all, validate_dataset
 
 PROJECT=Path(__file__).resolve().parents[1]
@@ -23,6 +24,30 @@ class MLPipelineTests(unittest.TestCase):
             profile=inspect_dataset(path)
             self.assertEqual(profile["rows"],4)
             self.assertEqual(profile["eligibility_distribution"],{"A":2,"B":2})
+
+    def test_unambiguous_serialization_and_gender_normalization(self):
+        d=_deps(); frame=pd.DataFrame({"monthly_salary":["18000.0.0","20000.0"]+[f"{30000+i}.0" for i in range(10)],
+            "bank_balance":["nan.0","12000.0.0"]+[f"{10000+i}.0" for i in range(10)],
+            "gender":["MALE","f"]+["male","female"]*5,
+            "employment_type":["Private","Government"]+["Self-employed"]*9+[None]})
+        cleaned,repairs,malformed,numeric_repairs=_clean_frame(frame,d["pd"])
+        self.assertEqual(cleaned["monthly_salary"].iloc[0],18000)
+        self.assertEqual(cleaned["monthly_salary"].iloc[1],20000)
+        self.assertTrue(pd.isna(cleaned["bank_balance"].iloc[0]))
+        self.assertEqual(cleaned["gender"].iloc[:2].tolist(),["Male","Female"])
+        self.assertGreater(numeric_repairs["monthly_salary"],0)
+        self.assertNotIn("monthly_salary",malformed)
+        engineered=_engineer(frame,d["pd"])
+        self.assertEqual(engineered["gender"].dtype,object)
+        self.assertTrue(np.isnan(engineered["employment_type"].iloc[-1]))
+
+    def test_classification_metrics_include_calibration_diagnostics(self):
+        d=_deps(); y=np.array([0,1,2,0,1,2]); probabilities=np.array([[.8,.1,.1],[.2,.7,.1],[.1,.2,.7],[.6,.3,.1],[.2,.6,.2],[.2,.2,.6]])
+        result=_metrics("classification",y,np.array([0,1,2,0,1,2]),d,["A","B","C"],probabilities)
+        self.assertEqual(result["per_class"]["A"]["recall"],1.0)
+        self.assertIn("multiclass_brier_score",result)
+        self.assertIn("expected_calibration_error_10_bins",result)
+        self.assertTrue(result["calibration_bins"])
 
     def test_six_model_mlflow_artifacts_and_inference(self):
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as temp:
@@ -50,6 +75,9 @@ class MLPipelineTests(unittest.TestCase):
             self.assertTrue((artifact_dir/"emi_eligibility.joblib").is_file())
             self.assertTrue((artifact_dir/"max_monthly_emi.joblib").is_file())
             self.assertTrue((artifact_dir/"model_comparison.csv").is_file())
+            self.assertTrue((artifact_dir/"data_quality_report.md").is_file())
+            comparison=pd.read_csv(artifact_dir/"model_comparison.csv")
+            self.assertEqual(len(comparison),6)
             for target in ("emi_eligibility","max_monthly_emi"):
                 artifact=load_artifact(target,artifact_dir)
                 self.assertEqual(len(artifact["dataset_sha256"]),64)
@@ -57,6 +85,7 @@ class MLPipelineTests(unittest.TestCase):
                 result=predict(target,values,artifact_dir)
                 self.assertEqual(result["target"],target)
                 self.assertIn("prediction",result)
+                if target=="max_monthly_emi": self.assertGreaterEqual(result["prediction"],artifact["target_min"])
             client=MlflowClient(tracking_uri=tracking)
             experiments=client.search_experiments()
             named={e.name:e for e in experiments}

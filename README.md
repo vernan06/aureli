@@ -27,13 +27,13 @@ The app offers account creation and a temporary guest demo. SQLite defaults to `
 - Stored money uses integer paise; loan math uses Decimal and rounds each scheduled payment to paise.
 - Records are scoped to the signed-in user in every data query.
 
-New accounts start empty. Guest mode is also empty and uses ordinary user-scoped records. EMI prediction remains unavailable until the specified internship dataset and its reuse rights are verified. Vendor datasets are excluded from training. Do not use `--confirm-data-rights` unless you have verified the data license/permission. Training command (after rights are cleared):
+New accounts start empty. Guest mode is also empty and uses ordinary user-scoped records. The company-provided dataset at `C:\Users\verna\Downloads\emi_prediction_dataset.csv` is authorized by the user for this internship project. The vendor clone and its copies are not used. Training outputs are local and ignored by Git.
 
 ```powershell
-python -m aureli.ml.train --data path\to\authorized-internship-data.csv --confirm-data-rights
+python -m aureli.ml.train "C:\Users\verna\Downloads\emi_prediction_dataset.csv" --confirm-data-rights --max-rows 120000 --artifact-dir artifacts/models
 ```
 
-Use `--quick` for a pipeline smoke run only; do not report its synthetic fixture metrics as product results. Training writes artifacts under `models/` and MLflow local runs under `mlruns/` (or the configured tracking URI). Keep generated artifacts and data private.
+Inspect without training by adding `--inspect-only`. The fit uses a reproducible, proportional stratified sample when valid rows exceed the 120,000-row local memory cap; two-fold cross-validation and modest randomized tuning bound CPU and memory. `--quick` is for pipeline smoke checks only. Training saves artifacts and the data-quality report under `artifacts/models/`, with local MLflow runs under `mlruns/`. Keep generated artifacts and source data private.
 
 ## Tests
 

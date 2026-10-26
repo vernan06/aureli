@@ -2,32 +2,32 @@
 
 ## Current state
 
-Aureli is a single local Streamlit application using Python 3.12, SQLite, one finance service, one loan calculation service, and one ML pipeline. Product features and verification evidence are tracked in FEATURE_ACCEPTANCE.md. A realistic local user journey is in DEMO_WALKTHROUGH.md.
+Aureli is one local Streamlit application on Python 3.12 with SQLite, owner-scoped finance services, Decimal loan calculations, non-mutating financial scenarios, report export, and a six-model EMI pipeline. Product state and evidence are in [FEATURE_ACCEPTANCE.md](FEATURE_ACCEPTANCE.md); model results and limitations are in [ML_RESULTS.md](ML_RESULTS.md); a realistic UI journey is in [DEMO_WALKTHROUGH.md](DEMO_WALKTHROUGH.md).
 
-The full dependency environment is in .venv. Launch from C:\aureli with:
+The prepared `.venv` uses Python 3.12.10. From `C:\aureli`:
 
     .venv\Scripts\streamlit.exe run streamlit_app.py
 
-Install dependencies with:
+To install dependencies:
 
     .venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-training.txt
 
-Run local verification with:
+Run verification:
 
     .venv\Scripts\python.exe -m unittest discover -s tests -v
 
-## ML/data boundary
+## Models and data
 
-The six-model workflow and MLflow integration are implemented and mechanically verified on a generated test fixture only. Do not report fixture metrics as product metrics. The specified internship dataset's reuse rights are unresolved: its vendor repository has no root license, and no separate dataset terms were found. No product training, output or saved model artifacts exist. Obtain the authorized dataset and documentary permission before invoking the CLI with --confirm-data-rights.
+The user authorized the company-supplied `C:\Users\verna\Downloads\emi_prediction_dataset.csv` for the internship Aureli project. The source file was read but not modified. All six requested workflows completed: Logistic Regression, Random Forest, XGBoost classification and Linear Regression, Random Forest, XGBoost regression. Each has a saved preprocessing/model pipeline and a FINISHED MLflow run; local champion versions are registered. Artifacts are under ignored `artifacts/models/`, and MLflow tracking is under ignored `mlruns/`. No trained model binaries or source dataset are committed.
 
-## Preservation and repository
+To reproduce the capped local training run:
 
-Vendor repositories under vendor/source/ and their nested Git metadata have been preserved and excluded from application code. No vendor source has been copied. The pre-existing dirty .gitignore edit was preserved and not included in the commit. No local financial database, models, MLflow runs, or generated test artifacts should be committed. No deployment was attempted.
+    .venv\Scripts\python.exe -m aureli.ml.train "C:\Users\verna\Downloads\emi_prediction_dataset.csv" --confirm-data-rights --max-rows 120000 --artifact-dir artifacts/models
 
-## Remaining external prerequisites
+Exact test metrics, dataset fingerprint, sampling design and limitations are in `docs/ML_RESULTS.md`. High_Risk classification performance is weak; the regression target generation rule is undocumented. Model outputs are advisory and require target documentation and external validation before production reliance. Earlier aborted diagnostic runs remain marked FAILED in MLflow; they are distinct from the six successful runs documented in ML_RESULTS.md.
 
-- Authorized internship dataset and explicit permission for model training.
-- Before any real deployment, choose durable private storage and validate deployment-specific security and retention behavior.
-- No demo video was recorded; DEMO_WALKTHROUGH.md is the actual-feature walkthrough.
+## Preservation and deployment
 
-Do not claim model predictions, product metrics, or public deployment as complete until the respective prerequisites are satisfied.
+Vendor repositories and nested Git metadata are preserved; no vendor source was copied into Aureli. The pre-existing `.gitignore` edit was kept outside Aureli commits. Never commit local databases, source data, model artifacts or MLflow runs. No deployment was performed. Hosted deployment still needs a durable private database/artifact storage design and deployment-specific security and retention validation.
+
+`DEMO_WALKTHROUGH.md` is a written walkthrough of actual local functionality. No demo video was recorded.

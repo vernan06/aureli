@@ -24,6 +24,7 @@ from aureli.intelligence.scenario import simulate_monthly_plan, forecast_from_hi
 from aureli.ml.inference import artifact_path, load_artifact, predict, explain_prediction
 from aureli.persistence.db import initialize
 
+MODEL_DIR=Path("artifacts/models")
 st.set_page_config(page_title="Aureli — Financial intelligence", page_icon="✦", layout="wide")
 st.markdown("""<style>
 :root{color-scheme:dark} .stApp{background:#08151e;color:#edf5f2}
@@ -263,7 +264,7 @@ elif page=="AI Assessment":
     targets=[("emi_eligibility","EMI eligibility"),("max_monthly_emi","Maximum affordable EMI")]
     for target,title in targets:
         if not artifact_path(target).is_file():
-            st.info(f"{title} is unavailable: no verified Aureli artifact exists. The supplied internship dataset is in an unlicensed repository and does not include separate dataset terms. No predictions are generated.")
+            st.info(f"{title} is unavailable because its trained Aureli model artifact is not present. No prediction is generated until authorized local training produces it.")
             continue
         try: artifact=load_artifact(target)
         except Exception as exc: st.error(f"Could not load {title} artifact: {exc}"); continue
@@ -293,7 +294,10 @@ elif page=="AI Assessment":
                             st.metric("Model assessment",result["prediction"])
                             if result["probabilities"]: st.dataframe([{"Class":label,"Model probability":f"{chance:.1%}"} for label,chance in result["probabilities"].items()],hide_index=True)
                             st.caption("Probabilities are model outputs and are not necessarily calibrated likelihoods of approval.")
-                        else: st.metric("Estimated maximum monthly EMI",f"₹{result['prediction']:,.2f}")
+                        else:
+                            st.metric("Estimated maximum monthly EMI",f"₹{result['prediction']:,.2f}")
+                            if result.get("range_limited"):
+                                st.caption(f"Estimate was bounded to the range observed in training: ₹{result['observed_target_range'][0]:,.2f}–₹{result['observed_target_range'][1]:,.2f}.")
                         st.caption(f"Model: {result['model_name']} · dataset fingerprint: {result['dataset_sha256'][:12]}")
                         explanation=explain_prediction(target,values)
                         st.markdown(f"**Explanation method:** {explanation['method']}")
@@ -302,7 +306,7 @@ elif page=="AI Assessment":
 
 elif page=="Model Laboratory":
     page_header("Model laboratory","Explore trained Aureli experiments and evaluation artifacts.")
-    comparison=Path("models/model_comparison.csv")
+    comparison=MODEL_DIR/"model_comparison.csv"
     if comparison.is_file():
         import pandas as pd
         table=pd.read_csv(comparison)
@@ -313,16 +317,16 @@ elif page=="Model Laboratory":
         if not candidates.empty:
             selected=st.selectbox("Evaluation artifact",candidates.to_dict("records"),format_func=lambda r:f"{r['target']} · {r['model']}")
             evaluation=Path(str(selected["evaluation_path"]))
-            filenames=["confusion_matrix.html"] if selected["task"]=="classification" else ["actual_vs_predicted.html","residuals.html"]
+            filenames=["confusion_matrix.html","calibration.html"] if selected["task"]=="classification" else ["actual_vs_predicted.html","residuals.html"]
             for filename in filenames:
                 plot_path=evaluation/filename
                 if plot_path.is_file():
                     st.markdown(f"**{filename.replace('_',' ').replace('.html','').title()}**")
                     st.components.v1.html(plot_path.read_text(encoding="utf-8"),height=500,scrolling=True)
     else:
-        st.info("No Aureli experiment results have been recorded yet. The supplied internship dataset is in an unlicensed repository and has no separate data terms; training is blocked until rights are resolved.")
+        st.info("No Aureli experiment results have been recorded yet. The authorized company dataset is available locally; run the documented six-model training command to create the experiments and artifacts.")
     for target,title in [("emi_eligibility","Classification"),("max_monthly_emi","Regression")]:
-        metadata=Path("models")/f"{target}.metadata.json"
+        metadata=MODEL_DIR/f"{target}.metadata.json"
         if not metadata.is_file(): continue
         import json
         info=json.loads(metadata.read_text(encoding="utf-8"))
